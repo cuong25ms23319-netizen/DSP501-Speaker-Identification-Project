@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data & Models (too large for git)
+data/raw/
+features/
+models/
+librispeech_tmp/
+test-clean.tar.gz
+
+# Figures (auto-generated)
+figures/
+
+# Results (auto-generated)
+results.json
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

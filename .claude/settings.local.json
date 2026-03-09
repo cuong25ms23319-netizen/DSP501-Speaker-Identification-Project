@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import numpy, scipy, librosa, sklearn, matplotlib, seaborn, streamlit, joblib, pandas, soundfile\")",
+      "Bash(python3 -c \"import numpy, scipy, librosa, sklearn, matplotlib, seaborn, streamlit, joblib, pandas, soundfile; print\\(''OK''\\)\")",
+      "Bash(pip3 --version)"
+    ]
+  }
+}
