@@ -20,6 +20,7 @@ import librosa
 
 from preprocess import preprocess
 from filter import design_fir, apply_filter
+from preemphasis import pre_emphasize
 
 
 # ── MFCC parameters ────────────────────────────────────────────────
@@ -74,9 +75,10 @@ def build_dataset(index_csv, pipeline='raw', data_dir='data/raw'):
         # Step 1: basic preprocessing (normalize, trim, pad)
         audio, sr = preprocess(path, sr=SR, target_len=TARGET_LEN)
 
-        # Step 2: apply FIR filter for Pipeline B
+        # Step 2: apply FIR filter and pre-emphasis for Pipeline B
         if pipeline == 'filtered':
             audio = apply_filter(audio, fir_coeffs)
+            audio = pre_emphasize(audio)
 
         # Step 3: extract MFCC feature vector
         feat = extract_mfcc(audio, sr=sr)
