@@ -4,8 +4,8 @@ Module 5: train.py
 Train and evaluate SVM models for both pipelines.
 
 Experiments:
-  A1 — SVM on raw MFCC features      (Pipeline A)
-  B1 — SVM on filtered MFCC features (Pipeline B)
+  A1 — SVM on basic time-domain features (Pipeline A — no DSP)
+  B1 — SVM on MFCC after FIR + pre-emphasis (Pipeline B — with DSP)
 
 Training strategy:
   - StratifiedKFold (5 folds) — preserves class balance
@@ -116,13 +116,13 @@ def main():
     ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     # Load pre-extracted features
-    X_raw  = np.load(os.path.join(ROOT, 'features', 'features_mfcc_raw.npy'))
-    X_filt = np.load(os.path.join(ROOT, 'features', 'features_mfcc_filt.npy'))
-    y      = np.load(os.path.join(ROOT, 'features', 'labels.npy'))
+    X_basic = np.load(os.path.join(ROOT, 'features', 'features_basic.npy'))
+    X_mfcc  = np.load(os.path.join(ROOT, 'features', 'features_mfcc_filt.npy'))
+    y       = np.load(os.path.join(ROOT, 'features', 'labels.npy'))
 
     # Run experiments
-    res_a1, model_a1 = run_experiment('A1_SVM_raw',  X_raw,  y)
-    res_b1, model_b1 = run_experiment('B1_SVM_filt', X_filt, y)
+    res_a1, model_a1 = run_experiment('A1_SVM_basic', X_basic, y)
+    res_b1, model_b1 = run_experiment('B1_SVM_dsp',   X_mfcc,  y)
 
     # Statistical test: does filtering improve SVM?
     t_stat, p_value = paired_ttest(
@@ -136,8 +136,8 @@ def main():
         'random_seed': RANDOM_SEED,
         'cv_folds': CV_FOLDS,
         'experiments': {
-            'A1_SVM_raw':  res_a1,
-            'B1_SVM_filt': res_b1,
+            'A1_SVM_basic': res_a1,
+            'B1_SVM_dsp':   res_b1,
         },
         'statistical_tests': {
             'SVM_A_vs_B': {'t_stat': t_stat, 'p_value': p_value}

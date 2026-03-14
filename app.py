@@ -38,11 +38,11 @@ INDEX_CSV = os.path.join(ROOT, 'data', 'index.csv')
 SR = 16000
 DURATION = 3
 TARGET_LEN = SR * DURATION
-REQUIRED_SAMPLES = 10
+REQUIRED_SAMPLES = 25
 
 # ── Mẫu transcript chuẩn ─────────────────────────────────────────────
 TRANSCRIPT = [
-    "Xin chào, tôi là thành viên của nhóm 4 đề tài DSP Identify Speaker",
+    "Xin chào, tôi là thành viên của nhóm bốn đề tài DSP Identify Speaker",
     "Hôm nay thời tiết thật đẹp, nắng vàng rực rỡ khắp nơi",
     "Trường đại học FPT nằm ở thành phố Hồ Chí Minh",
     "Xử lý tín hiệu số là môn học rất thú vị và bổ ích",
@@ -52,6 +52,21 @@ TRANSCRIPT = [
     "Bộ lọc thông dải chỉ cho phép một dải tần số đi qua",
     "Học máy kết hợp xử lý tín hiệu tạo ra ứng dụng hay",
     "Cảm ơn bạn đã lắng nghe bài thuyết trình của nhóm tôi",
+    "Nhận dạng người nói là bài toán quan trọng trong bảo mật",
+    "Phòng họp thông minh có thể tự động ghi nhận ai đang nói",
+    "Giọng nói mang nhiều thông tin về đặc điểm sinh học cá nhân",
+    "Hệ số MFCC mô tả hình dạng đường thanh quản của người nói",
+    "Thuật toán SVM tìm siêu phẳng phân tách tối ưu giữa các lớp",
+    "Tiền xử lý tín hiệu giúp loại bỏ nhiễu và cải thiện chất lượng",
+    "Cửa sổ Hamming giảm hiện tượng rò rỉ phổ khi tính FFT",
+    "Tần số lấy mẫu mười sáu nghìn Hertz là chuẩn cho xử lý giọng nói",
+    "Kiểm định thống kê giúp đánh giá kết quả một cách khách quan",
+    "Dữ liệu huấn luyện cần đa dạng để mô hình tổng quát hóa tốt",
+    "Việt Nam có năm mươi tư dân tộc với nhiều giọng nói khác nhau",
+    "Trí tuệ nhân tạo đang thay đổi cách chúng ta sống và làm việc",
+    "Ứng dụng nhận dạng giọng nói ngày càng phổ biến trên điện thoại",
+    "Chất lượng microphone ảnh hưởng lớn đến độ chính xác nhận dạng",
+    "Đây là câu cuối cùng trong bộ hai mươi lăm câu thu âm mẫu",
 ]
 
 

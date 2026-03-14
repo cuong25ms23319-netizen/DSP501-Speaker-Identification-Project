@@ -1,29 +1,29 @@
 """
 Module 4: feature_extraction.py
 --------------------------------
-Extract MFCC features from preprocessed audio.
+Feature extraction for both pipelines.
 
-Feature vector per file:
-  - 13 MFCC coefficients × (mean + std) = shape (26,)
-  - Captures vocal tract shape — highly speaker-discriminative
+Pipeline A (Baseline — no DSP):
+  Audio → basic time-domain features (energy, ZCR, stats)
+  Output: features/features_basic.npy
 
-Output files:
-  features/features_mfcc_raw.npy   → Pipeline A input
-  features/features_mfcc_filt.npy  → Pipeline B input
-  features/labels.npy              → integer speaker IDs
+Pipeline B (DSP Enhanced):
+  Audio → FIR filter → pre-emphasis → MFCC (mean + std)
+  Output: features/features_mfcc_filt.npy
+
+Labels: features/labels.npy
 """
 
 import os
 import numpy as np
 import pandas as pd
 import librosa
-
 from preprocess import preprocess
 from filter import design_fir, apply_filter
 from preemphasis import pre_emphasize
 
 
-# ── MFCC parameters ────────────────────────────────────────────────
+# ── Parameters ────────────────────────────────────────────────────
 N_MFCC = 13
 N_FFT = 512
 HOP_LENGTH = 256
@@ -31,9 +31,34 @@ SR = 16000
 TARGET_LEN = 48000   # 3 seconds × 16000 Hz
 
 
+def extract_basic_features(y, sr=SR):
+    """
+    Pipeline A: basic time-domain features — no DSP, no frequency analysis.
+
+    Features (6 dims):
+      1. RMS energy (mean)
+      2. RMS energy (std)
+      3. Zero Crossing Rate (mean)
+      4. Zero Crossing Rate (std)
+      5. Mean absolute amplitude
+      6. Std amplitude
+    """
+    rms = librosa.feature.rms(y=y, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
+    zcr = librosa.feature.zero_crossing_rate(y, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
+
+    return np.array([
+        rms.mean(),
+        rms.std(),
+        zcr.mean(),
+        zcr.std(),
+        np.mean(np.abs(y)),
+        np.std(y),
+    ], dtype=np.float64)
+
+
 def extract_mfcc(y, sr=SR, n_mfcc=N_MFCC):
     """
-    Extract MFCC feature vector from an audio array.
+    Pipeline B: MFCC feature vector (after FIR + pre-emphasis).
 
     Returns
     -------
@@ -60,28 +85,27 @@ def build_dataset(index_csv, pipeline='raw', data_dir='data/raw'):
 
     Returns
     -------
-    X      : float array of shape (n_samples, 26)
-    y      : int array of shape (n_samples,)   — speaker IDs
+    X      : float array — shape (n, 10) for raw, (n, 26) for filtered
+    y      : int array of shape (n_samples,)
     names  : list of speaker name strings
     """
     df = pd.read_csv(index_csv)
-    fir_coeffs = design_fir()  # only used for 'filtered' pipeline
+    fir_coeffs = design_fir()
 
     X, y, names = [], [], []
 
     for _, row in df.iterrows():
         path = os.path.join(data_dir, row['filename'])
-
-        # Step 1: basic preprocessing (normalize, trim, pad)
         audio, sr = preprocess(path, sr=SR, target_len=TARGET_LEN)
 
-        # Step 2: apply FIR filter and pre-emphasis for Pipeline B
         if pipeline == 'filtered':
+            # Pipeline B: FIR → pre-emphasis → MFCC
             audio = apply_filter(audio, fir_coeffs)
             audio = pre_emphasize(audio)
-
-        # Step 3: extract MFCC feature vector
-        feat = extract_mfcc(audio, sr=sr)
+            feat = extract_mfcc(audio, sr=sr)
+        else:
+            # Pipeline A: basic time-domain features only
+            feat = extract_basic_features(audio, sr=sr)
 
         X.append(feat)
         y.append(int(row['speaker_id']))
@@ -97,18 +121,18 @@ def save_features(index_csv, features_dir='features', data_dir='data/raw'):
     """
     os.makedirs(features_dir, exist_ok=True)
 
-    print("Extracting features — Pipeline A (raw) ...")
-    X_raw, y, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
+    print("Extracting features — Pipeline A (basic time-domain) ...")
+    X_basic, y, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
 
-    print("Extracting features — Pipeline B (filtered) ...")
-    X_filt, _, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir)
+    print("Extracting features — Pipeline B (FIR + pre-emphasis + MFCC) ...")
+    X_mfcc, _, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir)
 
-    np.save(os.path.join(features_dir, 'features_mfcc_raw.npy'), X_raw)
-    np.save(os.path.join(features_dir, 'features_mfcc_filt.npy'), X_filt)
+    np.save(os.path.join(features_dir, 'features_basic.npy'), X_basic)
+    np.save(os.path.join(features_dir, 'features_mfcc_filt.npy'), X_mfcc)
     np.save(os.path.join(features_dir, 'labels.npy'), y)
 
-    print(f"Saved: X_raw{X_raw.shape}, X_filt{X_filt.shape}, y{y.shape}")
-    return X_raw, X_filt, y
+    print(f"Saved: X_basic{X_basic.shape}, X_mfcc{X_mfcc.shape}, y{y.shape}")
+    return X_basic, X_mfcc, y
 
 
 # ── Quick test ──────────────────────────────────────────────────────
