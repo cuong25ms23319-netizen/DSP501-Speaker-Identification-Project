@@ -317,7 +317,9 @@ with tab_test:
             y_filt = apply_filter(y_proc, fir_coeffs)
             y_filt = pre_emphasize(y_filt)
 
+            # Pipeline A (Raw) uses basic time-domain features (6 dims)
             feat_raw = extract_basic_features(y_proc).reshape(1, -1)
+            # Pipeline B (Filtered) uses MFCC features (26 dims)
             feat_filt = extract_mfcc(y_filt).reshape(1, -1)
 
             st.markdown('---')
