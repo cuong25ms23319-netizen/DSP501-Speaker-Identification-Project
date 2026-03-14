@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from preprocess import normalize, trim_silence, pad_or_crop
 from filter import design_fir, apply_filter
 from preemphasis import pre_emphasize
-from feature_extraction import extract_mfcc
+from feature_extraction import extract_mfcc, extract_basic_features
 
 # ── Config ────────────────────────────────────────────────────────────
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -317,7 +317,7 @@ with tab_test:
             y_filt = apply_filter(y_proc, fir_coeffs)
             y_filt = pre_emphasize(y_filt)
 
-            feat_raw = extract_mfcc(y_proc).reshape(1, -1)
+            feat_raw = extract_basic_features(y_proc).reshape(1, -1)
             feat_filt = extract_mfcc(y_filt).reshape(1, -1)
 
             st.markdown('---')
