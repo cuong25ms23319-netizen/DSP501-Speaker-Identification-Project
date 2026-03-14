@@ -11,8 +11,8 @@ env/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Data & Models (too large for git)
-data/raw/
+# Data & Models
+# data/raw/ — NOT ignored, so team members can share audio via git
 features/
 models/
 librispeech_tmp/
