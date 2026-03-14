@@ -8,3 +8,4 @@ streamlit
 joblib
 pandas
 soundfile
+sounddevice

@@ -3,7 +3,18 @@
     "allow": [
       "Bash(python -c \"import numpy, scipy, librosa, sklearn, matplotlib, seaborn, streamlit, joblib, pandas, soundfile\")",
       "Bash(python3 -c \"import numpy, scipy, librosa, sklearn, matplotlib, seaborn, streamlit, joblib, pandas, soundfile; print\\(''OK''\\)\")",
-      "Bash(pip3 --version)"
+      "Bash(pip3 --version)",
+      "Bash(pip install sounddevice)",
+      "Bash(pip3 install sounddevice)",
+      "Bash(python3 src/feature_extraction.py)",
+      "Bash(pip3 install librosa scikit-learn pandas soundfile joblib scipy numpy)",
+      "Bash(python3 src/train.py)",
+      "Bash(pip3 install seaborn matplotlib)",
+      "Bash(pkill -f \"streamlit run record_app\")",
+      "Bash(python3 -c \"exec\\(open\\(''record_app.py''\\).read\\(\\)\\)\")",
+      "Bash(python3 -c \":*)",
+      "Bash(pip3 show streamlit)",
+      "Bash(pip3 install streamlit)"
     ]
   }
 }
