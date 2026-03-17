@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import soundfile as sf
 import joblib
 import streamlit as st
+from gtts import gTTS
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -190,6 +191,22 @@ def audio_to_bytes(y, sr=SR):
     return buf.read()
 
 
+def generate_greeting(name, confidence, speaker_names):
+    """Generate Vietnamese TTS greeting audio bytes."""
+    if confidence >= 70:
+        text = f"Xin chào {name}! Rất vui được gặp bạn."
+    elif confidence >= 50:
+        text = f"Chào bạn! Mình đoán bạn là {name}, đúng không?"
+    else:
+        text = (f"Xin lỗi, mình không nhận ra bạn. "
+                f"Bạn không phải thành viên nhóm 4. Bạn là ai vậy?")
+    buf = io.BytesIO()
+    tts = gTTS(text=text, lang='vi')
+    tts.write_to_fp(buf)
+    buf.seek(0)
+    return buf.read(), text
+
+
 # ── Auto-sync on load ────────────────────────────────────────────────
 new_found = sync_index_from_disk()
 
@@ -271,7 +288,6 @@ with tab_test:
     if not (os.path.exists(model_a_path) and os.path.exists(model_b_path)):
         st.error('Chưa có model! Hãy vào tab **Train** để train trước.')
     else:
-        @st.cache_resource
         def load_models():
             return {
                 'Pipeline A (Raw)': joblib.load(model_a_path),
@@ -417,6 +433,21 @@ with tab_test:
                 st.success(f'✅ Cả 2 pipeline đều nhận diện: **{name_a}**')
             else:
                 st.warning(f'⚠️ Pipeline A: **{name_a}** | Pipeline B: **{name_b}** — Kết quả khác nhau!')
+
+            # ── Bot chào hỏi bằng giọng nói ──────────────────────────
+            st.markdown('---')
+            st.markdown('### 🤖 Bot chào hỏi')
+
+            # Dùng kết quả Pipeline B (chính xác hơn)
+            model_b = models['Pipeline B (Filtered)']
+            proba_b = model_b.predict_proba(feat_filt)[0]
+            best_conf = float(proba_b[list(model_b.classes_).index(pred_b)]) * 100
+
+            all_names = sorted(set(speaker_map.values()))
+            greeting_audio, greeting_text = generate_greeting(name_b, best_conf, all_names)
+
+            st.markdown(f'> 🗣️ *"{greeting_text}"*')
+            st.audio(greeting_audio, format='audio/mp3', autoplay=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════
