@@ -19,7 +19,8 @@
       "Bash(git checkout HEAD -- data/raw/speaker_08/)",
       "Bash(git checkout HEAD -- data/index.csv)",
       "Bash(pkill -f \"streamlit run\")",
-      "Bash(streamlit run app.py)"
+      "Bash(streamlit run app.py)",
+      "Bash(git checkout HEAD -- src/train.py)"
     ]
   }
 }

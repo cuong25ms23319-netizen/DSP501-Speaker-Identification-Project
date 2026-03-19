@@ -32,7 +32,7 @@ CV_FOLDS = 5
 
 # SVM hyperparameter search space
 SVM_PARAM_GRID = {
-    'svm__C':     [0.01, 0.1, 1, 10],
+    'svm__C':     [0.1, 1, 10, 100],
     'svm__gamma': ['scale', 'auto', 0.001, 0.01],
 }
 

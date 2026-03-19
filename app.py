@@ -752,7 +752,7 @@ with tab_manage:
                 st.warning('Bạn chắc chắn muốn xóa **TẤT CẢ** data?')
                 c1, c2 = st.columns(2)
                 with c1:
-                    if st.button('✅ Xác nhận xóa tất cả', key='confirm_all_yes'):
+                    if st.button('Xác nhận xóa tất cả', key='confirm_all_yes'):
                         if os.path.exists(DATA_DIR):
                             shutil.rmtree(DATA_DIR)
                             os.makedirs(DATA_DIR)
@@ -860,13 +860,4 @@ with tab_train:
                         st.metric('F1 Score', f"{exp['f1_macro']['mean']:.2%}")
                         st.write(f"Best params: `{exp['best_params']}`")
 
-    st.divider()
-    st.markdown('#### 📤 Chia sẻ data cho nhóm (Git)')
-    st.code('''# Sau khi thu âm xong, push data lên GitHub:
-git add data/
-git commit -m "Add audio data for [tên bạn]"
-git push
 
-# Các bạn khác pull về — app tự nhận data mới:
-git pull
-streamlit run app.py''', language='bash')
