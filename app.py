@@ -24,7 +24,6 @@ import soundfile as sf
 import joblib
 import noisereduce as nr
 import streamlit as st
-from gtts import gTTS
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -213,21 +212,6 @@ def audio_to_bytes(y, sr=SR):
     return buf.read()
 
 
-def generate_greeting(name, confidence, speaker_names):
-    """Generate Vietnamese TTS greeting audio bytes."""
-    if confidence >= 70:
-        text = f"Xin chào {name}! Rất vui được gặp bạn."
-    elif confidence >= 50:
-        text = f"Chào bạn! Mình đoán bạn là {name}, đúng không?"
-    else:
-        text = (f"Xin lỗi, mình không nhận ra bạn. "
-                f"Bạn không phải thành viên nhóm 4. Bạn là ai vậy?")
-    buf = io.BytesIO()
-    tts = gTTS(text=text, lang='vi')
-    tts.write_to_fp(buf)
-    buf.seek(0)
-    return buf.read(), text
-
 
 # ── Auto-sync on load ────────────────────────────────────────────────
 new_found = sync_index_from_disk()
@@ -341,15 +325,17 @@ with tab_test:
                 test_audio = uploaded.read()
 
         if test_audio is not None:
-            # Lưu audio ra file WAV tạm, rồi dùng ĐÚNG preprocess() như training
             y_raw = process_audio(test_audio)
 
             # Nếu audio ngắn hơn 3s, lặp lại thay vì pad zero
-            # (zero-padding kéo lệch MFCC → nhận sai)
             if 0 < len(y_raw) < TARGET_LEN:
                 repeats = int(np.ceil(TARGET_LEN / len(y_raw)))
                 y_raw = np.tile(y_raw, repeats)[:TARGET_LEN]
 
+            # NR #1: giống recording tab (training data cũng bị NR ở bước này)
+            y_raw = nr.reduce_noise(y=y_raw, sr=SR, stationary=True, prop_decrease=0.75)
+
+            # Save temp WAV → preprocess() sẽ NR lần 2 (giống training pipeline)
             tmp_wav = os.path.join(ROOT, '_test_tmp.wav')
             sf.write(tmp_wav, y_raw, SR)
             try:
@@ -420,70 +406,193 @@ with tab_test:
                     st.pyplot(fig)
                     plt.close(fig)
 
-            st.markdown('### 🎯 Kết quả nhận diện')
-            col_a, col_b = st.columns(2)
+            # ── Pipeline B: Main prediction (DSP Enhanced) ──────────
+            model_b = models['Pipeline B (Filtered)']
+            pred_b = model_b.predict(feat_filt)[0]
+            proba_b = model_b.predict_proba(feat_filt)[0]
+            classes_b = model_b.classes_
+            name_b = speaker_map.get(pred_b, f'Speaker {pred_b}')
+            conf_b = float(proba_b[list(classes_b).index(pred_b)]) * 100
 
-            for col, pname, feat in [
-                (col_a, 'Pipeline A (Raw)', feat_raw),
-                (col_b, 'Pipeline B (Filtered)', feat_filt),
-            ]:
-                with col:
-                    model = models[pname]
-                    pred = model.predict(feat)[0]
-                    proba = model.predict_proba(feat)[0]
-                    classes = model.classes_
+            # ── Pipeline A: Baseline prediction ──────────────────
+            model_a = models['Pipeline A (Raw)']
+            pred_a = model_a.predict(feat_raw)[0]
+            proba_a = model_a.predict_proba(feat_raw)[0]
+            classes_a = model_a.classes_
+            name_a = speaker_map.get(pred_a, f'Speaker {pred_a}')
+            conf_a = float(proba_a[list(classes_a).index(pred_a)]) * 100
 
-                    pred_name = speaker_map.get(pred, f'Speaker {pred}')
-                    confidence = float(proba[list(classes).index(pred)]) * 100
+            # ── Hero result card ─────────────────────────────────
+            if conf_b >= 70:
+                border_color = '#2ecc71'
+                emoji = '🎯'
+                status_text = 'Độ tin cậy cao'
+            elif conf_b >= 50:
+                border_color = '#f39c12'
+                emoji = '🤔'
+                status_text = 'Độ tin cậy trung bình'
+            else:
+                border_color = '#e74c3c'
+                emoji = '❓'
+                status_text = 'Không chắc chắn'
 
-                    st.markdown(f'**{pname}**')
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                border-left: 6px solid {border_color};
+                border-radius: 16px;
+                padding: 30px;
+                margin: 20px 0;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            ">
+                <div style="text-align: center;">
+                    <span style="font-size: 48px;">{emoji}</span>
+                    <h1 style="color: white; margin: 10px 0 5px 0; font-size: 2.2em;">
+                        {name_b}
+                    </h1>
+                    <div style="
+                        display: inline-block;
+                        background: {border_color};
+                        color: white;
+                        padding: 6px 20px;
+                        border-radius: 20px;
+                        font-size: 1.1em;
+                        font-weight: bold;
+                    ">
+                        {conf_b:.1f}% — {status_text}
+                    </div>
+                    <p style="color: #8899aa; margin-top: 12px; font-size: 0.9em;">
+                        Pipeline B (FIR + Pre-emphasis + MFCC + SVM)
+                    </p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-                    if confidence >= 70:
-                        st.success(f'🎤 **{pred_name}** — {confidence:.1f}%')
-                    elif confidence >= 50:
-                        st.warning(f'🤔 **{pred_name}** — {confidence:.1f}%')
-                    else:
-                        st.error(f'❓ **{pred_name}** — {confidence:.1f}% (không chắc)')
+            # ── Confidence bars for all speakers ─────────────────
+            st.markdown('#### Phân bố xác suất theo Speaker')
 
-                    fig, ax = plt.subplots(figsize=(5, max(2, len(classes) * 0.4)))
-                    labels = [speaker_map.get(c, f'Speaker {c}') for c in classes]
-                    colors = ['#2ecc71' if c == pred else '#95a5a6' for c in classes]
-                    bars = ax.barh(labels, proba * 100, color=colors)
-                    ax.set_xlabel('Confidence (%)')
+            sorted_idx = np.argsort(proba_b)[::-1]
+            for i, idx in enumerate(sorted_idx):
+                spk_id = classes_b[idx]
+                spk_name = speaker_map.get(spk_id, f'Speaker {spk_id}')
+                prob = proba_b[idx] * 100
+                is_pred = (spk_id == pred_b)
+
+                if is_pred:
+                    bar_color = border_color
+                    label_style = f'color: {border_color}; font-weight: bold;'
+                else:
+                    bar_color = '#3a3a5c'
+                    label_style = 'color: #8899aa;'
+
+                col_name, col_bar, col_pct = st.columns([1.5, 6, 1])
+                with col_name:
+                    prefix = '▶ ' if is_pred else '  '
+                    st.markdown(f'<span style="{label_style}">{prefix}{spk_name}</span>',
+                                unsafe_allow_html=True)
+                with col_bar:
+                    st.progress(min(prob / 100, 1.0))
+                with col_pct:
+                    st.markdown(f'<span style="{label_style}">{prob:.1f}%</span>',
+                                unsafe_allow_html=True)
+
+            # ── Pipeline comparison (collapsible) ────────────────
+            with st.expander('🔬 So sánh Pipeline A vs Pipeline B', expanded=False):
+                col_cmp_a, col_cmp_b = st.columns(2)
+
+                with col_cmp_a:
+                    st.markdown(f"""
+                    <div style="background: #2d2d44; border-radius: 12px; padding: 16px; text-align: center;">
+                        <p style="color: #8899aa; margin: 0; font-size: 0.85em;">PIPELINE A — Baseline</p>
+                        <p style="color: #e74c3c; font-size: 0.75em;">Không có DSP (chỉ RMS + ZCR)</p>
+                        <h2 style="color: white; margin: 8px 0;">{name_a}</h2>
+                        <span style="background: {'#2ecc71' if conf_a >= 70 else '#e74c3c'}; color: white;
+                               padding: 4px 12px; border-radius: 12px; font-size: 0.9em;">
+                            {conf_a:.1f}%
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    fig, ax = plt.subplots(figsize=(5, max(2, len(classes_a) * 0.35)))
+                    labels_a = [speaker_map.get(c, f'Spk {c}') for c in classes_a]
+                    colors_a = ['#e74c3c' if c == pred_a else '#3a3a5c' for c in classes_a]
+                    ax.barh(labels_a, proba_a * 100, color=colors_a, height=0.6)
                     ax.set_xlim(0, 100)
-                    for bar, p in zip(bars, proba):
-                        if p > 0.05:
-                            ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height() / 2,
-                                    f'{p * 100:.1f}%', va='center', fontsize=9)
+                    ax.set_xlabel('Confidence (%)')
+                    ax.set_facecolor('#1a1a2e')
+                    fig.patch.set_facecolor('#1a1a2e')
+                    ax.tick_params(colors='#8899aa')
+                    ax.xaxis.label.set_color('#8899aa')
+                    for spine in ax.spines.values():
+                        spine.set_color('#3a3a5c')
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close(fig)
 
-            st.markdown('---')
-            pred_a = models['Pipeline A (Raw)'].predict(feat_raw)[0]
-            pred_b = models['Pipeline B (Filtered)'].predict(feat_filt)[0]
-            name_a = speaker_map.get(pred_a, f'Speaker {pred_a}')
-            name_b = speaker_map.get(pred_b, f'Speaker {pred_b}')
+                with col_cmp_b:
+                    st.markdown(f"""
+                    <div style="background: #1a3a2e; border-radius: 12px; padding: 16px; text-align: center;">
+                        <p style="color: #8899aa; margin: 0; font-size: 0.85em;">PIPELINE B — DSP Enhanced</p>
+                        <p style="color: #2ecc71; font-size: 0.75em;">FIR + Pre-emphasis + MFCC</p>
+                        <h2 style="color: white; margin: 8px 0;">{name_b}</h2>
+                        <span style="background: {'#2ecc71' if conf_b >= 70 else '#e74c3c'}; color: white;
+                               padding: 4px 12px; border-radius: 12px; font-size: 0.9em;">
+                            {conf_b:.1f}%
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-            if pred_a == pred_b:
-                st.success(f'✅ Cả 2 pipeline đều nhận diện: **{name_a}**')
+                    fig, ax = plt.subplots(figsize=(5, max(2, len(classes_b) * 0.35)))
+                    labels_b = [speaker_map.get(c, f'Spk {c}') for c in classes_b]
+                    colors_b = ['#2ecc71' if c == pred_b else '#3a3a5c' for c in classes_b]
+                    ax.barh(labels_b, proba_b * 100, color=colors_b, height=0.6)
+                    ax.set_xlim(0, 100)
+                    ax.set_xlabel('Confidence (%)')
+                    ax.set_facecolor('#1a1a2e')
+                    fig.patch.set_facecolor('#1a1a2e')
+                    ax.tick_params(colors='#8899aa')
+                    ax.xaxis.label.set_color('#8899aa')
+                    for spine in ax.spines.values():
+                        spine.set_color('#3a3a5c')
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close(fig)
+
+                # Verdict
+                if pred_a == pred_b:
+                    st.success(f'✅ Cả 2 pipeline đều nhận diện: **{name_b}**')
+                else:
+                    st.info(f'💡 Pipeline A: **{name_a}** ({conf_a:.0f}%) vs Pipeline B: **{name_b}** ({conf_b:.0f}%) — Pipeline B chính xác hơn nhờ DSP')
+
+            # ── Greeting message (no internet needed) ────────────
+            st.markdown('---')
+            if conf_b >= 70:
+                st.markdown(f"""
+                <div style="background: linear-gradient(90deg, #1a3a2e, #16213e); border-radius: 12px; padding: 20px; text-align: center;">
+                    <span style="font-size: 32px;">👋</span>
+                    <p style="color: white; font-size: 1.3em; margin: 8px 0;">
+                        Xin chào <strong>{name_b}</strong>! Rất vui được gặp bạn.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            elif conf_b >= 50:
+                st.markdown(f"""
+                <div style="background: linear-gradient(90deg, #3a2a1e, #2e2e16); border-radius: 12px; padding: 20px; text-align: center;">
+                    <span style="font-size: 32px;">🤔</span>
+                    <p style="color: white; font-size: 1.3em; margin: 8px 0;">
+                        Chào bạn! Mình đoán bạn là <strong>{name_b}</strong>, đúng không?
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.warning(f'⚠️ Pipeline A: **{name_a}** | Pipeline B: **{name_b}** — Kết quả khác nhau!')
-
-            # ── Bot chào hỏi bằng giọng nói ──────────────────────────
-            st.markdown('---')
-            st.markdown('### 🤖 Bot chào hỏi')
-
-            # Dùng kết quả Pipeline B (chính xác hơn)
-            model_b = models['Pipeline B (Filtered)']
-            proba_b = model_b.predict_proba(feat_filt)[0]
-            best_conf = float(proba_b[list(model_b.classes_).index(pred_b)]) * 100
-
-            all_names = sorted(set(speaker_map.values()))
-            greeting_audio, greeting_text = generate_greeting(name_b, best_conf, all_names)
-
-            st.markdown(f'> 🗣️ *"{greeting_text}"*')
-            st.audio(greeting_audio, format='audio/mp3', autoplay=True)
+                st.markdown(f"""
+                <div style="background: linear-gradient(90deg, #3a1a1a, #2e1616); border-radius: 12px; padding: 20px; text-align: center;">
+                    <span style="font-size: 32px;">❓</span>
+                    <p style="color: white; font-size: 1.3em; margin: 8px 0;">
+                        Xin lỗi, mình không nhận ra bạn rõ ràng.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════

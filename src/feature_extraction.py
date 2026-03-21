@@ -175,8 +175,8 @@ def save_features(index_csv, features_dir='features', data_dir='data/raw'):
     print("Extracting features — Pipeline A (basic time-domain) ...")
     X_basic, y_basic, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
 
-    print("Extracting features — Pipeline B (FIR + pre-emphasis + MFCC) + augmentation ...")
-    X_mfcc, y_mfcc, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir, augment=True)
+    print("Extracting features — Pipeline B (FIR + pre-emphasis + MFCC) ...")
+    X_mfcc, y_mfcc, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir, augment=False)
 
     np.save(os.path.join(features_dir, 'features_basic.npy'), X_basic)
     np.save(os.path.join(features_dir, 'features_mfcc_filt.npy'), X_mfcc)
