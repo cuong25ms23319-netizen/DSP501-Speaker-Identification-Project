@@ -1,0 +1,307 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\setbeamertemplate{note page}[plain]
+
+\definecolor{fptOrange}{RGB}{243,112,33}
+\setbeamercolor{structure}{fg=fptOrange}
+\setbeamercolor{title}{fg=white,bg=fptOrange}
+\setbeamercolor{frametitle}{fg=white,bg=fptOrange}
+
+\title{Speaker Identification System}
+\subtitle{DSP-Enhanced Pipeline vs.\ Baseline}
+\author{Nguyen Huy Cuong \and Hon Vi Dan \and Le Nhut Thanh Quang \and Nguyen Duc Minh Khoa}
+\institute{FPT University — DSP501\\Supervisor: Dr.\ Dang Ngoc Minh Duc}
+\date{2025}
+
+\begin{document}
+
+% ============================================================
+\begin{frame}
+\titlepage
+\end{frame}
+
+% ============================================================
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+% ============================================================
+\section{Introduction}
+\begin{frame}{Problem \& Motivation}
+\begin{itemize}
+    \item \textbf{Goal:} Identify \emph{who} is speaking from a short audio clip
+    \item \textbf{Challenge:} Speech is non-stationary, noisy, and varies across sessions
+    \item \textbf{Research question:} Does a dedicated DSP preprocessing pipeline improve speaker identification accuracy over a raw-signal baseline?
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Approach:} Compare two pipelines
+\begin{description}
+    \item[Pipeline A] Raw signal $\rightarrow$ basic time-domain features $\rightarrow$ SVM
+    \item[Pipeline B] FIR filter + pre-emphasis $\rightarrow$ MFCC features $\rightarrow$ SVM
+\end{description}
+\end{frame}
+
+% ============================================================
+\section{Dataset}
+\begin{frame}{Dataset}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{itemize}
+    \item \textbf{5 speakers}: Dan, Cuong, Quang, Anne, Khoa
+    \item \textbf{25 files} per speaker ($\times 5 = 125$ total)
+    \item Duration: $\sim$3 seconds each
+    \item Mono WAV, $f_s = 16{,}000$ Hz
+    \item $48{,}000$ samples per clip
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Preprocessing steps:}
+\begin{enumerate}
+    \item Load as mono 16 kHz
+    \item Normalize to $[-1,1]$
+    \item Trim silence ($-20$ dB)
+    \item Pad/crop to 48{,}000 samples
+\end{enumerate}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section{DSP Methodology}
+\begin{frame}{FIR Bandpass Filter}
+\begin{itemize}
+    \item \textbf{Type:} Bandpass 300--3400 Hz (Hamming window, 101 taps)
+    \item \textbf{Purpose:} Isolate speech formants ($F_1, F_2, F_3$)
+    \item Removes low-frequency hum ($<300$ Hz) and high-frequency noise ($>3400$ Hz)
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Ideal impulse response:}
+$$h_{\text{ideal}}[n] = \frac{\sin(\omega_{\text{high}}(n - M/2))}{\pi(n - M/2)} - \frac{\sin(\omega_{\text{low}}(n - M/2))}{\pi(n - M/2)}$$
+
+\textbf{Final coefficients:} $h[n] = h_{\text{ideal}}[n] \cdot w[n]$ where $w[n]$ is Hamming window
+\end{frame}
+
+\begin{frame}{Pre-emphasis Filter}
+\textbf{Problem:} Speech energy drops $-6$ dB/octave at higher frequencies
+
+\vspace{0.3cm}
+\textbf{Solution:} First-order high-pass filter
+$$y'[n] = y[n] - 0.97 \cdot y[n-1]$$
+
+\vspace{0.3cm}
+\textbf{Effect:}
+\begin{itemize}
+    \item Boosts high-frequency consonant/sibilant energy
+    \item Flattens spectrum $\rightarrow$ better MFCC extraction
+    \item Balances formant energies across frequency range
+\end{itemize}
+\end{frame}
+
+% ============================================================
+\section{Feature Engineering}
+\begin{frame}{Pipeline A — Baseline Features (6-dim)}
+\begin{table}
+\centering
+\begin{tabular}{clp{7cm}}
+\toprule
+\textbf{\#} & \textbf{Feature} & \textbf{Meaning} \\
+\midrule
+1 & RMS Energy (mean) & Average loudness: $\sqrt{\frac{1}{N}\sum x[n]^2}$ \\
+2 & RMS Energy (std) & Energy variation over time \\
+3 & ZCR (mean) & Rate of signal sign changes \\
+4 & ZCR (std) & Variation in ZCR across frames \\
+5 & Mean $|$amplitude$|$ & Average absolute amplitude \\
+6 & Std amplitude & Amplitude dispersion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.2cm}
+\begin{center}
+\textit{$\Rightarrow$ Only time-domain information — no frequency content!}
+\end{center}
+\end{frame}
+
+\begin{frame}{Pipeline B — MFCC Extraction (26-dim)}
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\textbf{6-step process:}
+\begin{enumerate}
+    \item \textbf{Frame} into 512-sample windows
+    \item \textbf{Hamming window} each frame
+    \item \textbf{FFT} $\rightarrow$ power spectrum
+    \item \textbf{Mel filterbank} (26 filters)
+    \item \textbf{Log} of energies
+    \item \textbf{DCT} $\rightarrow$ 13 MFCCs/frame
+\end{enumerate}
+\end{column}
+\begin{column}{0.45\textwidth}
+\textbf{Mel scale:}
+$$\text{Mel}(f) = 2595 \cdot \log_{10}\!\left(1 + \frac{f}{700}\right)$$
+
+\vspace{0.3cm}
+\textbf{Final vector (per clip):}
+$$\mathbf{x} = [\mu_1 \ldots \mu_{13},\ \sigma_1 \ldots \sigma_{13}]$$
+mean + std of 13 MFCCs $= \mathbf{26}$~dim
+\end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section{AI Modeling}
+\begin{frame}{SVM with RBF Kernel}
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\textbf{Why SVM?}
+\begin{itemize}
+    \item Works well with small datasets
+    \item Effective in high-dimensional space
+    \item Clear decision boundaries
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{RBF Kernel:}
+$$K(\mathbf{x}_i, \mathbf{x}_j) = \exp\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2\right)$$
+\end{column}
+\begin{column}{0.45\textwidth}
+\textbf{Training pipeline:}
+\begin{enumerate}
+    \item StandardScaler (per fold)
+    \item SVM (RBF kernel)
+\end{enumerate}
+
+\vspace{0.2cm}
+\textbf{Hyperparameter grid:}
+\begin{table}
+\centering
+\begin{tabular}{ll}
+\toprule
+$C$ & 0.1, 1, 10, 100 \\
+$\gamma$ & scale, auto, 0.001, 0.01 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.1cm}
+\textbf{Evaluation:} 5-fold Stratified CV\\
+\textbf{Tuning:} GridSearchCV (3-fold)
+\end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section{Results}
+\begin{frame}{Experimental Results}
+\begin{table}
+\centering
+\large
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Pipeline} & \textbf{Best $C$} & \textbf{Best $\gamma$} & \textbf{Mean Accuracy} & \textbf{95\% CI} \\
+\midrule
+A — Baseline     & 1  & scale & $56.3\% \pm 2.8\%$ & $[52.4\%,\ 60.1\%]$ \\
+B — DSP-enhanced & 1  & scale & $\mathbf{97.0\% \pm 3.6\%}$ & $[92.0\%,\ 102.1\%]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.4cm}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{F1-score (Macro):}
+\begin{itemize}
+    \item Pipeline A: 0.690
+    \item Pipeline B: \textbf{1.000}
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Paired $t$-test:}
+$$t = -34.79,\quad p = 0.000004$$
+$p \ll 0.05$ $\Rightarrow$ \textbf{Highly significant!}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================
+\section{Discussion}
+\begin{frame}{Why Pipeline B Wins}
+\begin{enumerate}
+    \item \textbf{Feature richness}\\
+    26-dim MFCCs capture vocal tract shape\\
+    vs.\ 6-dim time features — only amplitude info
+
+    \vspace{0.4cm}
+    \item \textbf{Noise suppression}\\
+    FIR bandpass + pre-emphasis isolate speech frequencies\\
+    $\Rightarrow$ improved SNR before feature extraction
+
+    \vspace{0.4cm}
+    \item \textbf{Massive accuracy gap}\\
+    $+40.7$ percentage points (56.3\% $\rightarrow$ 97.0\%)\\
+    Computational cost: $<1$ ms per 3-second clip
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Limitations}
+\begin{itemize}
+    \item \textbf{Small dataset:} 5 speakers, 125 samples — may not generalize to larger populations
+    \vspace{0.2cm}
+    \item \textbf{Clean recordings only:} Trained in quiet conditions; noisy environments degrade mic-based predictions
+    \vspace{0.2cm}
+    \item \textbf{Closed-set:} Cannot reject unknown speakers
+    \vspace{0.2cm}
+    \item \textbf{Single classifier:} Only SVM tested — other models may respond differently
+    \vspace{0.2cm}
+    \item \textbf{Fixed filter design:} 300--3400 Hz passband not optimized per dataset
+\end{itemize}
+\end{frame}
+
+% ============================================================
+\section{Conclusion}
+\begin{frame}{Conclusion}
+\begin{block}{Key Findings}
+\begin{enumerate}
+    \item \textbf{DSP preprocessing is essential} — 40.7 pp accuracy gain confirmed by paired $t$-test ($p < 0.001$)
+    \item \textbf{MFCC features} capture speaker-specific vocal tract characteristics far better than basic time-domain descriptors
+    \item \textbf{Handcrafted DSP + SVM} achieves 97\% accuracy on a small dataset — no deep learning required
+\end{enumerate}
+\end{block}
+
+\vspace{0.3cm}
+\textbf{Future work:}
+\begin{itemize}
+    \item More speakers, noisy conditions, noise reduction for real-time mic
+    \item Integrate DSP front-end with neural network architectures
+\end{itemize}
+\end{frame}
+
+% ============================================================
+\begin{frame}
+\begin{center}
+\Huge \textbf{Live Demo}
+
+\vspace{0.5cm}
+\large Streamlit App — Speaker Identification
+
+\vspace{0.3cm}
+\normalsize Upload file WAV or record from mic
+\end{center}
+\end{frame}
+
+% ============================================================
+\begin{frame}
+\begin{center}
+\Huge \textbf{Thank You!}
+
+\vspace{0.5cm}
+\large Questions?
+\end{center}
+\end{frame}
+
+\end{document}

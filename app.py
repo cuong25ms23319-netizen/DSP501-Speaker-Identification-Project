@@ -22,6 +22,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import soundfile as sf
 import joblib
+import noisereduce as nr
 import streamlit as st
 from gtts import gTTS
 
@@ -238,7 +239,7 @@ if new_found:
 
 # ── Sidebar: speaker list ────────────────────────────────────────────
 with st.sidebar:
-    st.image('https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/FPT_logo_2010.svg/1200px-FPT_logo_2010.svg.png', width=120)
+    st.image('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/FPT_logo_2024.svg/1200px-FPT_logo_2024.svg.png', width=120)
     st.markdown('### Speakers')
     speakers = get_speakers()
     if speakers.empty:
@@ -324,6 +325,10 @@ with tab_test:
                 y = y[:TARGET_LEN]
             elif len(y) < TARGET_LEN:
                 y = np.pad(y, (0, TARGET_LEN - len(y)))
+
+            # Noise reduction for mic input (handles classroom/noisy environments)
+            if test_mode == '🎙️ Thu âm từ mic':
+                y = nr.reduce_noise(y=y, sr=SR, prop_decrease=0.8)
 
             y_proc = normalize(y)
             y_proc = trim_silence(y_proc)
