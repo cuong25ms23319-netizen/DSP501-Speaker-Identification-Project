@@ -28,7 +28,7 @@ from gtts import gTTS
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from preprocess import normalize, trim_silence, pad_or_crop
+from preprocess import preprocess as preprocess_file, normalize, trim_silence, pad_or_crop
 from filter import design_fir, apply_filter
 from preemphasis import pre_emphasize
 from feature_extraction import extract_mfcc, extract_basic_features
@@ -143,15 +143,36 @@ def sync_index_from_disk():
 
 
 def process_audio(audio_bytes):
-    """Convert uploaded audio bytes to 16kHz mono numpy array."""
-    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = tmp.name
+    """Convert uploaded audio bytes to 16kHz mono numpy array.
+    Handles WAV (from file upload) and WebM/OGG (from browser mic)."""
+    # Try soundfile first (handles WAV natively)
     try:
-        y, _ = librosa.load(tmp_path, sr=SR, mono=True)
-    finally:
-        os.unlink(tmp_path)
-    return y
+        buf = io.BytesIO(audio_bytes)
+        y, orig_sr = sf.read(buf, dtype='float32')
+        if y.ndim > 1:
+            y = y.mean(axis=1)
+        if orig_sr != SR:
+            y = librosa.resample(y, orig_sr=orig_sr, target_sr=SR)
+        return y
+    except Exception:
+        pass
+
+    # Fallback: temp file with correct extension for ffmpeg decode
+    for ext in ['.webm', '.ogg', '.wav', '.mp3']:
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            y, _ = librosa.load(tmp_path, sr=SR, mono=True)
+            return y
+        except Exception:
+            continue
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    raise ValueError("Không thể đọc file audio")
 
 
 def split_into_chunks(y, chunk_len=TARGET_LEN, min_len=SR):
@@ -320,19 +341,22 @@ with tab_test:
                 test_audio = uploaded.read()
 
         if test_audio is not None:
-            y = process_audio(test_audio)
-            if len(y) > TARGET_LEN:
-                y = y[:TARGET_LEN]
-            elif len(y) < TARGET_LEN:
-                y = np.pad(y, (0, TARGET_LEN - len(y)))
+            # Lưu audio ra file WAV tạm, rồi dùng ĐÚNG preprocess() như training
+            y_raw = process_audio(test_audio)
 
-            # Noise reduction for mic input (handles classroom/noisy environments)
-            if test_mode == '🎙️ Thu âm từ mic':
-                y = nr.reduce_noise(y=y, sr=SR, prop_decrease=0.8)
+            # Nếu audio ngắn hơn 3s, lặp lại thay vì pad zero
+            # (zero-padding kéo lệch MFCC → nhận sai)
+            if 0 < len(y_raw) < TARGET_LEN:
+                repeats = int(np.ceil(TARGET_LEN / len(y_raw)))
+                y_raw = np.tile(y_raw, repeats)[:TARGET_LEN]
 
-            y_proc = normalize(y)
-            y_proc = trim_silence(y_proc)
-            y_proc = pad_or_crop(y_proc, TARGET_LEN)
+            tmp_wav = os.path.join(ROOT, '_test_tmp.wav')
+            sf.write(tmp_wav, y_raw, SR)
+            try:
+                y_proc, _ = preprocess_file(tmp_wav, sr=SR, target_len=TARGET_LEN)
+            finally:
+                if os.path.exists(tmp_wav):
+                    os.unlink(tmp_wav)
 
             fir_coeffs = get_fir()
             y_filt = apply_filter(y_proc, fir_coeffs)
@@ -345,6 +369,13 @@ with tab_test:
 
             st.markdown('---')
             st.audio(audio_to_bytes(y_proc), format='audio/wav')
+
+            # Debug info
+            with st.expander('🔍 Debug info', expanded=False):
+                st.text(f'Raw input: {len(y_raw)} samples ({len(y_raw)/SR:.2f}s)')
+                st.text(f'After preprocess: {len(y_proc)} samples')
+                st.text(f'Signal energy (RMS): {np.sqrt(np.mean(y_proc**2)):.4f}')
+                st.text(f'MFCC[0:3]: {feat_filt[0,:3].round(2)}')
 
             with st.expander('📊 Phân tích tín hiệu', expanded=False):
                 col_w1, col_w2 = st.columns(2)
@@ -522,6 +553,9 @@ with tab_record:
             if audio_data is not None:
                 audio_bytes = audio_data.read()
                 y = process_audio(audio_bytes)
+
+                # Noise reduction trước khi save — xử lý mic ồn
+                y = nr.reduce_noise(y=y, sr=SR, stationary=True, prop_decrease=0.75)
 
                 if len(y) > TARGET_LEN:
                     y = y[:TARGET_LEN]

@@ -60,20 +60,59 @@ def extract_mfcc(y, sr=SR, n_mfcc=N_MFCC):
     """
     Pipeline B: MFCC feature vector (after FIR + pre-emphasis).
 
+    Steps:
+      1. Compute 13 MFCC coefficients per frame
+      2. Drop MFCC[0] (log-energy — channel-dependent)
+      3. Compute delta (velocity) and delta-delta (acceleration)
+      4. Aggregate: mean + std of MFCC, delta, delta-delta → 72-dim vector
+
+    Delta features capture HOW the voice changes over time —
+    more robust to mic/channel differences than static MFCC alone.
+
     Returns
     -------
-    feature : 1-D array of shape (2 * n_mfcc,) = (mean, std) concatenated
+    feature : 1-D array of shape (72,)
     """
     mfcc = librosa.feature.mfcc(y=y, sr=sr,
                                  n_mfcc=n_mfcc,
                                  n_fft=N_FFT,
                                  hop_length=HOP_LENGTH)
-    mean = mfcc.mean(axis=1)   # shape (n_mfcc,)
-    std = mfcc.std(axis=1)     # shape (n_mfcc,)
-    return np.concatenate([mean, std])
+    mfcc = mfcc[1:]            # drop MFCC[0] (energy — channel-dependent)
+
+    # Delta (velocity) — how MFCC changes frame-to-frame
+    delta = librosa.feature.delta(mfcc)
+    # Delta-delta (acceleration) — rate of change of delta
+    delta2 = librosa.feature.delta(mfcc, order=2)
+
+    # Aggregate each: mean + std across time
+    parts = []
+    for feat in [mfcc, delta, delta2]:
+        parts.append(feat.mean(axis=1))   # (12,)
+        parts.append(feat.std(axis=1))    # (12,)
+
+    return np.concatenate(parts)  # 12*6 = 72 dims
 
 
-def build_dataset(index_csv, pipeline='raw', data_dir='data/raw'):
+def augment_audio(y, sr=SR):
+    """
+    Generate augmented versions of audio for robustness.
+    Simulates mic/environment variations: volume change, noise, pitch shift.
+    """
+    augmented = []
+    # 1. Volume variations (mic gain differences)
+    for gain in [0.5, 0.7, 1.3]:
+        augmented.append(np.clip(y * gain, -1.0, 1.0))
+    # 2. Add background noise at various SNR levels
+    for snr_db in [20, 15, 10]:
+        noise = np.random.randn(len(y)) * np.sqrt(np.mean(y**2) / (10**(snr_db/10)))
+        augmented.append(np.clip(y + noise, -1.0, 1.0))
+    # 3. Slight pitch shift (simulates different mic frequency response)
+    for n_steps in [-0.5, 0.5]:
+        augmented.append(librosa.effects.pitch_shift(y=y, sr=sr, n_steps=n_steps))
+    return augmented
+
+
+def build_dataset(index_csv, pipeline='raw', data_dir='data/raw', augment=False):
     """
     Build feature matrix X and label array y from an index CSV.
 
@@ -82,10 +121,11 @@ def build_dataset(index_csv, pipeline='raw', data_dir='data/raw'):
     index_csv : path to CSV with columns [filename, speaker_id, speaker_name]
     pipeline  : 'raw' (Pipeline A) or 'filtered' (Pipeline B)
     data_dir  : root folder containing speaker subdirectories
+    augment   : if True, add augmented versions for Pipeline B
 
     Returns
     -------
-    X      : float array — shape (n, 10) for raw, (n, 26) for filtered
+    X      : float array
     y      : int array of shape (n_samples,)
     names  : list of speaker name strings
     """
@@ -100,16 +140,27 @@ def build_dataset(index_csv, pipeline='raw', data_dir='data/raw'):
 
         if pipeline == 'filtered':
             # Pipeline B: FIR → pre-emphasis → MFCC
-            audio = apply_filter(audio, fir_coeffs)
-            audio = pre_emphasize(audio)
-            feat = extract_mfcc(audio, sr=sr)
+            audio_f = apply_filter(audio, fir_coeffs)
+            audio_f = pre_emphasize(audio_f)
+            feat = extract_mfcc(audio_f, sr=sr)
+            X.append(feat)
+            y.append(int(row['speaker_id']))
+            names.append(row['speaker_name'])
+
+            # Data augmentation: add variations for robustness
+            if augment:
+                for aug_audio in augment_audio(audio, sr):
+                    aug_f = apply_filter(aug_audio, fir_coeffs)
+                    aug_f = pre_emphasize(aug_f)
+                    X.append(extract_mfcc(aug_f, sr=sr))
+                    y.append(int(row['speaker_id']))
+                    names.append(row['speaker_name'])
         else:
             # Pipeline A: basic time-domain features only
             feat = extract_basic_features(audio, sr=sr)
-
-        X.append(feat)
-        y.append(int(row['speaker_id']))
-        names.append(row['speaker_name'])
+            X.append(feat)
+            y.append(int(row['speaker_id']))
+            names.append(row['speaker_name'])
 
     return np.array(X), np.array(y), names
 
@@ -122,17 +173,21 @@ def save_features(index_csv, features_dir='features', data_dir='data/raw'):
     os.makedirs(features_dir, exist_ok=True)
 
     print("Extracting features — Pipeline A (basic time-domain) ...")
-    X_basic, y, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
+    X_basic, y_basic, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
 
-    print("Extracting features — Pipeline B (FIR + pre-emphasis + MFCC) ...")
-    X_mfcc, _, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir)
+    print("Extracting features — Pipeline B (FIR + pre-emphasis + MFCC) + augmentation ...")
+    X_mfcc, y_mfcc, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir, augment=True)
 
     np.save(os.path.join(features_dir, 'features_basic.npy'), X_basic)
     np.save(os.path.join(features_dir, 'features_mfcc_filt.npy'), X_mfcc)
-    np.save(os.path.join(features_dir, 'labels.npy'), y)
+    np.save(os.path.join(features_dir, 'labels_basic.npy'), y_basic)
+    np.save(os.path.join(features_dir, 'labels_mfcc.npy'), y_mfcc)
+    # Backward compat
+    np.save(os.path.join(features_dir, 'labels.npy'), y_basic)
 
-    print(f"Saved: X_basic{X_basic.shape}, X_mfcc{X_mfcc.shape}, y{y.shape}")
-    return X_basic, X_mfcc, y
+    print(f"Saved: X_basic{X_basic.shape}, X_mfcc{X_mfcc.shape}")
+    print(f"       y_basic{y_basic.shape}, y_mfcc{y_mfcc.shape}")
+    return X_basic, X_mfcc, y_basic, y_mfcc
 
 
 # ── Quick test ──────────────────────────────────────────────────────
