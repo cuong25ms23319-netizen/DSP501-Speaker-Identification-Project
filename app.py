@@ -24,6 +24,7 @@ import soundfile as sf
 import joblib
 import noisereduce as nr
 import streamlit as st
+from gtts import gTTS
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -585,35 +586,78 @@ with tab_test:
                 else:
                     st.info(f'💡 Pipeline A: **{name_a}** ({conf_a:.0f}%) vs Pipeline B: **{name_b}** ({conf_b:.0f}%) — Pipeline B chính xác hơn nhờ DSP')
 
-            # ── Greeting message (no internet needed) ────────────
+            # ── AI Assistant Response ─────────────────────────────
             st.markdown('---')
+            import random
+
             if conf_b >= 70:
-                st.markdown(f"""
-                <div style="background: linear-gradient(90deg, #1a3a2e, #16213e); border-radius: 12px; padding: 20px; text-align: center;">
-                    <span style="font-size: 32px;">👋</span>
-                    <p style="color: white; font-size: 1.3em; margin: 8px 0;">
-                        Xin chào <strong>{name_b}</strong>! Rất vui được gặp bạn.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                greetings = [
+                    f"Xin chào {name_b}! Tôi nhận ra giọng nói của bạn ngay lập tức. Hệ thống DSP phân tích đặc trưng thanh quản và xác nhận danh tính của bạn với độ tin cậy {conf_b:.0f} phần trăm. Chào mừng bạn quay trở lại!",
+                    f"Chào {name_b}! Giọng nói của bạn rất đặc trưng. Sau khi phân tích qua bộ lọc FIR và trích xuất MFCC, tôi tự tin {conf_b:.0f} phần trăm rằng bạn chính là {name_b}. Rất vui được gặp lại!",
+                    f"À, {name_b} đây rồi! Tôi đã phân tích 12 hệ số MFCC từ giọng nói của bạn và đối chiếu với cơ sở dữ liệu. Kết quả khớp {conf_b:.0f} phần trăm. Xin chào!",
+                ]
+                greeting_text = random.choice(greetings)
+                emoji = '🤖'
+                border = '#2ecc71'
+                bg = 'linear-gradient(135deg, #0d2818 0%, #1a3a2e 50%, #16213e 100%)'
             elif conf_b >= 50:
-                st.markdown(f"""
-                <div style="background: linear-gradient(90deg, #3a2a1e, #2e2e16); border-radius: 12px; padding: 20px; text-align: center;">
-                    <span style="font-size: 32px;">🤔</span>
-                    <p style="color: white; font-size: 1.3em; margin: 8px 0;">
-                        Chào bạn! Mình đoán bạn là <strong>{name_b}</strong>, đúng không?
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                greetings = [
+                    f"Hmm, tôi nghĩ bạn là {name_b}, nhưng chưa chắc lắm. Độ tin cậy chỉ {conf_b:.0f} phần trăm. Có thể môi trường hơi ồn. Bạn thử nói lại gần mic hơn được không?",
+                    f"Nếu tôi đoán không nhầm thì bạn là {name_b}? Tín hiệu hơi nhiễu nên tôi chỉ tự tin {conf_b:.0f} phần trăm thôi. Thử thu âm lại trong môi trường yên tĩnh hơn nhé!",
+                ]
+                greeting_text = random.choice(greetings)
+                emoji = '🤔'
+                border = '#f39c12'
+                bg = 'linear-gradient(135deg, #2d1f0e 0%, #3a2a1e 50%, #2e2e16 100%)'
             else:
-                st.markdown(f"""
-                <div style="background: linear-gradient(90deg, #3a1a1a, #2e1616); border-radius: 12px; padding: 20px; text-align: center;">
-                    <span style="font-size: 32px;">❓</span>
-                    <p style="color: white; font-size: 1.3em; margin: 8px 0;">
-                        Xin lỗi, mình không nhận ra bạn rõ ràng.
-                    </p>
+                all_names = ', '.join(sorted(set(speaker_map.values())))
+                greetings = [
+                    f"Cảnh báo! Bạn không phải thành viên nhóm 4. Hệ thống chỉ nhận diện được: {all_names}. Giọng nói của bạn không khớp với bất kỳ ai trong cơ sở dữ liệu. Độ tin cậy cao nhất chỉ {conf_b:.0f} phần trăm — quá thấp để xác nhận danh tính.",
+                    f"Phát hiện người lạ! Sau khi phân tích MFCC và đối chiếu với {len(speaker_map)} người nói đã đăng ký, không tìm thấy kết quả khớp. Confidence chỉ {conf_b:.0f} phần trăm. Bạn không thuộc hệ thống nhận diện này.",
+                ]
+                greeting_text = random.choice(greetings)
+                emoji = '🚨'
+                border = '#e74c3c'
+                bg = 'linear-gradient(135deg, #2d0e0e 0%, #3a1a1a 50%, #2e1616 100%)'
+
+            st.markdown(f"""
+            <div style="
+                background: {bg};
+                border-left: 5px solid {border};
+                border-radius: 16px;
+                padding: 24px 28px;
+                margin: 16px 0;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            ">
+                <div style="display: flex; align-items: flex-start; gap: 16px;">
+                    <div style="
+                        background: {border}22;
+                        border-radius: 50%;
+                        width: 52px; height: 52px;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 28px; flex-shrink: 0;
+                    ">{emoji}</div>
+                    <div>
+                        <p style="color: {border}; font-size: 0.8em; font-weight: bold; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 1px;">
+                            DSP AI Assistant
+                        </p>
+                        <p style="color: #e0e0e0; font-size: 1.1em; margin: 0; line-height: 1.6;">
+                            {greeting_text}
+                        </p>
+                    </div>
                 </div>
-                """, unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Text-to-Speech
+            try:
+                tts_buf = io.BytesIO()
+                tts = gTTS(text=greeting_text, lang='vi')
+                tts.write_to_fp(tts_buf)
+                tts_buf.seek(0)
+                st.audio(tts_buf.read(), format='audio/mp3', autoplay=True)
+            except Exception:
+                pass  # No internet — skip TTS silently
 
 
 # ═══════════════════════════════════════════════════════════════════════
