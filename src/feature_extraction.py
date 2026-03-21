@@ -63,34 +63,20 @@ def extract_mfcc(y, sr=SR, n_mfcc=N_MFCC):
     Steps:
       1. Compute 13 MFCC coefficients per frame
       2. Drop MFCC[0] (log-energy — channel-dependent)
-      3. Compute delta (velocity) and delta-delta (acceleration)
-      4. Aggregate: mean + std of MFCC, delta, delta-delta → 72-dim vector
-
-    Delta features capture HOW the voice changes over time —
-    more robust to mic/channel differences than static MFCC alone.
+      3. Aggregate: mean + std → 24-dim vector
 
     Returns
     -------
-    feature : 1-D array of shape (72,)
+    feature : 1-D array of shape (24,)
     """
     mfcc = librosa.feature.mfcc(y=y, sr=sr,
                                  n_mfcc=n_mfcc,
                                  n_fft=N_FFT,
                                  hop_length=HOP_LENGTH)
     mfcc = mfcc[1:]            # drop MFCC[0] (energy — channel-dependent)
-
-    # Delta (velocity) — how MFCC changes frame-to-frame
-    delta = librosa.feature.delta(mfcc)
-    # Delta-delta (acceleration) — rate of change of delta
-    delta2 = librosa.feature.delta(mfcc, order=2)
-
-    # Aggregate each: mean + std across time
-    parts = []
-    for feat in [mfcc, delta, delta2]:
-        parts.append(feat.mean(axis=1))   # (12,)
-        parts.append(feat.std(axis=1))    # (12,)
-
-    return np.concatenate(parts)  # 12*6 = 72 dims
+    mean = mfcc.mean(axis=1)   # shape (12,)
+    std = mfcc.std(axis=1)     # shape (12,)
+    return np.concatenate([mean, std])
 
 
 def augment_audio(y, sr=SR):

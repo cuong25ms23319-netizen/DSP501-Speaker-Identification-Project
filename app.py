@@ -327,15 +327,16 @@ with tab_test:
         if test_audio is not None:
             y_raw = process_audio(test_audio)
 
-            # Nếu audio ngắn hơn 3s, lặp lại thay vì pad zero
-            if 0 < len(y_raw) < TARGET_LEN:
-                repeats = int(np.ceil(TARGET_LEN / len(y_raw)))
-                y_raw = np.tile(y_raw, repeats)[:TARGET_LEN]
+            # ĐÚNG Y HỆT recording tab + training pipeline:
+            # recording saves: process_audio → pad/crop → sf.write
+            # training loads:  librosa.load → NR → normalize → trim → pad
+            # Ở đây ta simulate cả 2 bước bằng: save → load lại → NR → normalize → trim → pad
+            if len(y_raw) > TARGET_LEN:
+                y_raw = y_raw[:TARGET_LEN]
+            elif len(y_raw) < TARGET_LEN:
+                y_raw = np.pad(y_raw, (0, TARGET_LEN - len(y_raw)))
 
-            # NR #1: giống recording tab (training data cũng bị NR ở bước này)
-            y_raw = nr.reduce_noise(y=y_raw, sr=SR, stationary=True, prop_decrease=0.75)
-
-            # Save temp WAV → preprocess() sẽ NR lần 2 (giống training pipeline)
+            # Save rồi load lại qua sf.write → librosa.load (giống recording→training)
             tmp_wav = os.path.join(ROOT, '_test_tmp.wav')
             sf.write(tmp_wav, y_raw, SR)
             try:
@@ -362,6 +363,26 @@ with tab_test:
                 st.text(f'After preprocess: {len(y_proc)} samples')
                 st.text(f'Signal energy (RMS): {np.sqrt(np.mean(y_proc**2)):.4f}')
                 st.text(f'MFCC[0:3]: {feat_filt[0,:3].round(2)}')
+
+                # Save debug file và test lại qua training pipeline
+                debug_path = os.path.join(ROOT, '_debug_mic.wav')
+                sf.write(debug_path, y_raw, SR)
+                # Load lại như training
+                y_dbg, _ = preprocess_file(debug_path, sr=SR, target_len=TARGET_LEN)
+                fir_dbg = design_fir()
+                y_dbg_f = apply_filter(y_dbg, fir_dbg)
+                y_dbg_f = pre_emphasize(y_dbg_f)
+                feat_dbg = extract_mfcc(y_dbg_f).reshape(1, -1)
+                pred_dbg = models['Pipeline B (Filtered)'].predict(feat_dbg)[0]
+                conf_dbg = models['Pipeline B (Filtered)'].predict_proba(feat_dbg)[0].max() * 100
+                name_dbg = speaker_map.get(pred_dbg, f'Speaker {pred_dbg}')
+
+                st.text(f'--- SAVED FILE TEST ---')
+                st.text(f'Saved MFCC[0:3]: {feat_dbg[0,:3].round(2)}')
+                st.text(f'Saved predict: {name_dbg} ({conf_dbg:.1f}%)')
+                st.text(f'Live  MFCC[0:3]: {feat_filt[0,:3].round(2)}')
+                match = 'MATCH' if np.allclose(feat_filt[0], feat_dbg[0], atol=0.01) else 'MISMATCH'
+                st.text(f'Features: {match}')
 
             with st.expander('📊 Phân tích tín hiệu', expanded=False):
                 col_w1, col_w2 = st.columns(2)
@@ -663,8 +684,8 @@ with tab_record:
                 audio_bytes = audio_data.read()
                 y = process_audio(audio_bytes)
 
-                # Noise reduction trước khi save — xử lý mic ồn
-                y = nr.reduce_noise(y=y, sr=SR, stationary=True, prop_decrease=0.75)
+                # KHÔNG NR ở đây — để preprocess() làm NR khi training
+                # (giống test tab: save raw → preprocess() NR 1 lần)
 
                 if len(y) > TARGET_LEN:
                     y = y[:TARGET_LEN]
