@@ -20,7 +20,20 @@
       "Bash(git checkout HEAD -- data/index.csv)",
       "Bash(pkill -f \"streamlit run\")",
       "Bash(streamlit run app.py)",
-      "Bash(git checkout HEAD -- src/train.py)"
+      "Bash(git checkout HEAD -- src/train.py)",
+      "Bash(brew install poppler)",
+      "Bash(brew list poppler)",
+      "Bash(pdftoppm -png -r 150 -f 1 -l 1 \"/Users/cuong/Downloads/main.pdf\" /tmp/pdf_page)",
+      "Read(//private/tmp/**)",
+      "Bash(pip show noisereduce)",
+      "Bash(pip install noisereduce)",
+      "Bash(pip3 install noisereduce)",
+      "Bash(python3 -c \"import noisereduce; print\\(noisereduce.__version__\\)\")",
+      "Bash(python3 -c \"import noisereduce as nr; print\\(''OK''\\)\")",
+      "Bash(lsof -ti:8502)",
+      "Bash(pip3 show:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 make_slides.py)"
     ]
   }
 }
