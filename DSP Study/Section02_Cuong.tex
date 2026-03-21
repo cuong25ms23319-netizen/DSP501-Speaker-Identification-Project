@@ -1,0 +1,20 @@
+\subsection{Dataset}
+We use speech recordings from 5 speakers, each with 25 audio files of approximately 3 seconds. All files are mono WAV at a sampling rate of $f_s = 16{,}000$ Hz, giving $48{,}000$ samples per clip.
+
+\subsection{Preprocessing}
+Before any analysis, each audio file goes through four steps:
+\begin{enumerate}
+  \item \textbf{Load} the audio as mono at 16 kHz.
+  \item \textbf{Normalize} amplitude to $[-1, 1]$ by dividing by the peak value:
+  $$y_{\text{norm}}[n] = \frac{y[n]}{\max |y[n]|}$$
+  \item \textbf{Trim silence} — remove quiet parts at the beginning and end (threshold: $-20$ dB).
+  \item \textbf{Pad or crop} to exactly $48{,}000$ samples so every clip has the same length.
+\end{enumerate}
+
+\subsection{Raw Signal Observations}
+Speech is non-stationary — its properties change over time. Voiced sounds (like vowels) show periodic patterns, while unvoiced sounds (like /s/) look like noise. The FFT of a raw signal shows that most speech energy falls between 300 Hz and 4000 Hz, where the fundamental frequency and formants are located. Energy below 300 Hz is often room noise; energy above 3400 Hz adds little to speech intelligibility.
+
+\subsection{SNR Estimation}
+We measure the Signal-to-Noise Ratio to see how much the filter cleans the signal:
+$$\text{SNR} = 10 \cdot \log_{10}\left(\frac{\text{power of filtered signal}}{\text{power of removed components}}\right)$$
+where the "removed components" are the difference between the raw and filtered signals.

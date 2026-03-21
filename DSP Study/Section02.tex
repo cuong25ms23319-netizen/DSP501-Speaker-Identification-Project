@@ -1,0 +1,91 @@
+A band-pass filter in the range of 300–3400 Hz is applied to retain the most informative speech components while suppressing low-frequency noise and high-frequency interference. This range aligns with the effective bandwidth used in traditional speech processing and ensures robust feature extraction for SVM-based classification.
+
+\subsection{Filter}
+
+The FIR band-pass filter effectively suppresses out-of-band noise while preserving the essential speech components. The filtered signal exhibits a significantly cleaner waveform, with near-zero amplitude in non-speech regions, indicating strong noise attenuation. Moreover, the temporal structure of the speech signal is maintained, confirming that the filter introduces minimal distortion due to its linear phase property.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/fir_output.png}
+    \caption{Time-domain waveform before and after filtering. The filtered signal shows reduced noise and smoother amplitude variations.}
+    \label{fig:fir_output}
+\end{figure}
+
+\subsection{Pre-emphasis}
+
+The magnitude difference observed after pre-emphasis is expected, as the filter amplifies high-frequency components while attenuating low-frequency energy. Although the absolute magnitude decreases, the spectral shape becomes more balanced, which improves feature extraction for speech processing tasks.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/emphasis_output.png}
+    \caption{Frequency spectrum before and after pre-emphasis, showing attenuation of low-frequency components and enhancement of high-frequency content}
+    \label{fig:emphasis_output}
+\end{figure}
+
+\subsection{Frequency Response}
+
+The flat passband around 0 dB ensures that the speech signal within the frequency range of 300–3400 Hz is preserved without distortion. This is critical for maintaining important speech characteristics such as formants and harmonic structures. Additionally, the strong stopband attenuation (approximately -80 dB) effectively suppresses unwanted frequency components and noise outside the speech band. As a result, the filter improves signal quality and enhances the robustness of subsequent feature extraction and classification tasks.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/magnitude_response.png}
+    \caption{Magnitude Response of the FIR Band-pass Filter for Speech Signal (300--3400 Hz)}
+    \label{fig:magnitude_response}
+\end{figure}
+
+\subsection{Short-Time Fourier Transform (STFT) and Spectrogram}
+
+The spectrogram of the filtered signal. Most of the signal energy is concentrated within the 300–3400 Hz range, which confirms the effectiveness of the band-pass filter. High-frequency noise is significantly attenuated, as indicated by the absence of strong components above this range.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/STFT.png}
+    \caption{Short-Time Fourier Transform (STFT) and Spectrogram}
+    \label{fig:stft}
+\end{figure}
+
+\subsection{Wavelet Transform and Scalogram}
+
+Fig. ~\ref{fig:wavelet} shows that most signal energy is concentrated above 1 kHz, corresponding to important speech components such as harmonics and formants. Low-frequency components below 500 Hz are significantly suppressed, indicating effective noise removal.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/wavelet.png}
+    \caption{Short-Time Fourier Transform (STFT) and Spectrogram}
+    \label{fig:wavelet}
+\end{figure}
+
+\subsection{Spectral Leakage}
+
+The rectangular window exhibits significant spectral leakage, as evidenced by high sidelobe levels spreading energy across adjacent frequencies. In contrast, the Hamming window effectively suppresses sidelobes, reducing leakage by approximately 20–30 dB and concentrating energy around the main frequency component. This improvement is achieved at the cost of a wider mainlobe, reflecting the trade-off between frequency resolution and leakage suppression. The results highlight the importance of window selection in spectral analysis, particularly for speech signals where accurate frequency representation is critical.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/spectral_leakage.png}
+    \caption{Short-Time Fourier Transform (STFT) and Spectrogram}
+    \label{fig:spectral_leakage}
+\end{figure}
+
+\subsection{Spectrogram Analysis: SMALL vs LARGE Window}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/window_size.png}
+    \caption{Short-Time Fourier Transform (STFT) and Spectrogram}
+    \label{fig:window_size}
+\end{figure}
+
+The small FFT window yields high temporal resolution — onset and offset boundaries of each acoustic event are sharply defined along the time axis. However, frequency resolution is severely limited: energy spreads broadly across the Hz axis, and harmonic structure is unresolvable. The 500–1500 Hz region appears as a diffuse orange mass rather than discrete spectral bands, indicating insufficient frequency bin density to separate individual partials.
+
+The large window produces the inverse behavior. Harmonic structure emerges distinctly as parallel horizontal striations extending from approximately 200 Hz to 3000 Hz, characteristic of a pitched source — likely voiced speech or a tonal musical instrument. The regularly spaced harmonic series is clearly resolved, supporting pitch estimation and timbre analysis. The trade-off, however, is degraded temporal resolution: event boundaries are smeared and onsets lack the sharpness observed in the SMALL window case.
+
+\subsection{Power Spectal Density}
+
+Fig. ~\ref{fig:psd} confirms the effectiveness of the FIR bandpass filter. Within the passband (300–3400 Hz), the filtered signal preserves the spectral shape of the raw signal while reducing absolute energy due to normalization. Below 300 Hz, noise is attenuated by approximately 30 dB. Above 3400 Hz, the filter achieves over 90 dB of stopband rejection, effectively eliminating high-frequency interference irrelevant to speech intelligibility.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/psd.png}
+    \caption{Short-Time Fourier Transform (STFT) and Spectrogram}
+    \label{fig:psd}
+\end{figure}

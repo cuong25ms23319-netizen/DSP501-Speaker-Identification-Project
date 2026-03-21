@@ -1,0 +1,9 @@
+\begin{enumerate}
+  \item \textbf{Small dataset} — Only 5 speakers with 25 files each (125 total). Results may not generalize to larger populations.
+  \item \textbf{Clean recordings} — All recordings were made in quiet conditions, limiting our ability to demonstrate the noise-reduction benefit of DSP.
+  \item \textbf{Closed-set only} — The system assumes all test speakers are known. It cannot reject unknown speakers.
+  \item \textbf{Single classifier} — Only SVM was tested. Other models (Random Forest, neural networks) may respond differently to DSP preprocessing.
+  \item \textbf{Basic features} — Only MFCC mean and std were used. Adding delta MFCCs, spectral centroid, or zero crossing rate could improve results.
+  \item \textbf{Fixed filter design} — The 300–3400 Hz passband was not optimized for this specific dataset.
+  \item The FIR-MFCC pipeline handles stationary noise well but struggles with non-stationary interference (e.g., 50 dB background music) due to spectral overlap. Future work should explore Deep Learning methods like Blind Source Separation to resolve this issue.
+\end{enumerate}

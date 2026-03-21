@@ -1,0 +1,59 @@
+
+\subsection{FIR Design}
+
+This section presents the complete set of formulas for FIR filter design using the window method (as implemented in \texttt{firwin}).
+
+\subsubsection{Ideal Impulse Response ($h_{\text{ideal}}$)}
+The ideal bandpass filter is constructed by subtracting the impulse response of a lower-frequency low-pass filter from a higher-frequency low-pass filter:
+\begin{equation}
+h_{\text{ideal}}[n] = \frac{\sin\left(\omega_{\text{high}} \left(n - \frac{M}{2}\right)\right)}{\pi \left(n - \frac{M}{2}\right)} - \frac{\sin\left(\omega_{\text{low}} \left(n - \frac{M}{2}\right)\right)}{\pi \left(n - \frac{M}{2}\right)}
+\end{equation}
+Where:
+\begin{itemize}
+  \item $M$: The filter order ($M = \text{numtaps} - 1$).
+  \item $n$: The sample index, ranging from $0$ to $M$.
+  \item $\omega_{\text{low}}, \omega_{\text{high}}$: normalized angular frequencies (rad/sample), calculated as
+  \begin{equation}
+  \omega = \frac{2\pi f}{f_s}
+  \end{equation}
+  \item $\left(n - \frac{M}{2}\right)$: the time shift that ensures the filter is symmetric and has a linear phase.
+\end{itemize}
+
+
+\subsubsection{Window Function ($w[n]$)}
+To truncate the infinite ideal impulse response into a finite one, we multiply it by a Hamming window:
+\begin{equation}
+w[n] = 0.54 - 0.46 \cos\left(\frac{2\pi n}{M}\right)
+\end{equation}
+
+\subsubsection{Final Filter Coefficients ($h[n]$)}
+These are the filter taps returned by \texttt{scipy.signal.firwin} in the coefficient array:
+\begin{equation}
+h[n] = h_{\text{ideal}}[n] \cdot w[n]
+\end{equation}
+
+\subsubsection{Handling the Singular Point}
+At the center of the filter, where $n = \frac{M}{2}$, the denominator becomes zero. By L'H\^{o}pital's rule, the value at this point is defined as:
+\begin{equation}
+h_{\text{ideal}}\left[\frac{M}{2}\right] = \frac{\omega_{\text{high}} - \omega_{\text{low}}}{\pi}
+\end{equation}
+
+\subsection{Pre-emphasis (High-Frequency Boosting)}
+
+\textbf{The Problem (Spectral Tilt):} In natural speech, the energy of the signal decreases as the frequency increases (typically at a rate of $-6$ dB/octave). Consequently, high-frequency components (such as consonants and sibilants) are significantly weaker than low-frequency components (vowels). 
+
+\textbf{The Solution:} To balance the power spectrum, we apply a first-order pre-emphasis high-pass filter to the 1-D audio signal. This process amplifies the high-frequency content, making the signal more uniform across the frequency domain. 
+
+The mathematical representation of this filter in the discrete-time domain is:
+\begin{equation}
+    y'[n] = y[n] - \alpha \cdot y[n-1]
+\end{equation}
+
+\textbf{Parameters:}
+\begin{itemize}
+    \item $y$: 1-D array representing the input audio signal.
+    \item $\alpha$: Pre-emphasis coefficient in $[0, 1)$. Typical values range from $0.95$ to $0.97$ (most commonly $0.97$).
+\end{itemize}
+
+\textbf{Mechanism \& Impact:} 
+By subtracting a large percentage of the previous sample from the current one, the filter suppresses slowly changing components (low frequencies) while highlighting rapid changes (high frequencies). This results in \textit{spectral flattening}, ensuring that the subsequent Mel-filterbank and DCT steps can efficiently extract meaningful features from the entire frequency range, rather than being dominated by low-frequency energy.

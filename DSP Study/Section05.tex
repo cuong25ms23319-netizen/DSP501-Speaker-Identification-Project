@@ -1,0 +1,27 @@
+\subsection{Classifier: SVM with RBF Kernel}
+We use a Support Vector Machine (SVM) with the Radial Basis Function (RBF) kernel:
+$$K(\mathbf{x}_i, \mathbf{x}_j) = \exp\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2\right)$$
+SVM works well with small datasets and high-dimensional features, which fits our scenario (26 features, 125 samples).
+
+\subsection{Feature Scaling}
+SVM is sensitive to feature scale, so we standardize all features to zero mean and unit variance using \texttt{StandardScaler}. The scaler is fitted only on training data inside each CV fold to avoid data leakage.
+
+\subsection{Hyperparameter Tuning}
+We search over the following grid using \texttt{GridSearchCV} with 3-fold inner CV:
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Values} \\
+\hline
+$C$ & $\{0.1,\ 1,\ 10,\ 100\}$ \\
+$\gamma$ & $\{\text{scale},\ \text{auto},\ 0.001,\ 0.01\}$ \\
+\hline
+\end{tabular}
+\caption{SVM hyperparameter search space.}
+\end{table}
+
+\subsection{Evaluation Strategy}
+We evaluate using \textbf{5-fold Stratified Cross-Validation} (random seed = 42). Stratification keeps the same proportion of each speaker in every fold. This gives us 5 accuracy scores, from which we compute the mean, standard deviation, and 95\% confidence interval.
+

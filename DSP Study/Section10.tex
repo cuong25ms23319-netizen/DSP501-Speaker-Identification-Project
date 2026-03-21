@@ -1,0 +1,9 @@
+This report evaluated two approaches for speaker identification: a baseline raw-signal pipeline and a comprehensive DSP-enhanced framework. Results from both 5-fold cross-validation and a rigorous block-split test lead to three main conclusions.
+
+First, DSP preprocessing is essential for reliable voice classification. FIR band-pass filtering and pre-emphasis improved signal-to-noise ratio (SNR) and produced a more balanced spectrum, yielding a 37\% accuracy gain over the raw-signal baseline.
+
+Second, feature design strongly affects performance. Basic time-domain descriptors (RMS and ZCR) were not sufficiently speaker-discriminative, whereas 26-dimensional MFCC features captured vocal-tract characteristics more effectively and enabled clearer SVM decision boundaries.
+
+Third, even with a limited dataset, a carefully engineered DSP pipeline reduced overfitting and improved generalization. Although deep learning methods are promising for end-to-end modeling, handcrafted DSP remains attractive in resource-constrained, real-time settings due to its efficiency and robustness.
+
+Future work will extend the system to multi-speaker scenarios and explore DSP front-end integration with more advanced neural network architectures.

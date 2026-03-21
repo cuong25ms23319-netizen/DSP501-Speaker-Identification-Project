@@ -1,0 +1,35 @@
+\subsection{Accuracy}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Experiment} & \textbf{Best $C$} & \textbf{Best $\gamma$} & \textbf{Mean Accuracy} & \textbf{95\% CI} \\
+\hline
+A1 — SVM Raw      & 1  & scale & $0.563 \pm 0.028$ & $[0.524,\ 0.601]$ \\
+B1 — SVM Filtered & 1  & scale & $0.970 \pm 0.036$ & $[0.920,\ 1.021]$ \\
+\hline
+\end{tabular}
+\caption{5-fold cross-validation results.}
+\end{table}
+
+Pipeline A achieved a mean accuracy of 56.3\% across 5 folds, reflecting the limited discriminative power of basic time-domain features. Pipeline B achieved 97.0\%, demonstrating the effectiveness of DSP preprocessing combined with MFCC features.
+
+\subsection{Additional Metrics}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metric} & \textbf{Pipeline A} & \textbf{Pipeline B} \\
+\hline
+F1-score (Macro) & 0.690 & 1.000 \\
+\hline
+\end{tabular}
+\caption{F1-score on training set predictions.}
+\end{table}
+
+\subsection{Statistical Test}
+A paired $t$-test comparing the fold scores gives:
+$$t = -34.79, \quad p = 0.000004$$
+Since $p \ll 0.05$, the difference is \textbf{highly statistically significant}. Pipeline B (DSP-enhanced) significantly outperforms Pipeline A (baseline), confirming that DSP preprocessing substantially improves speaker identification accuracy.

@@ -1,0 +1,26 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metric} & \textbf{Pipeline A (Baseline)} & \textbf{Pipeline B (DSP-enhanced)} \\
+\hline
+Mean CV Accuracy & $0.563 \pm 0.028$ & $0.970 \pm 0.036$ \\
+F1-score (Macro) & 0.690 & 1.000 \\
+Best $C$ (SVM) & 1 & 1 \\
+Best $\gamma$ (SVM) & scale & scale \\
+\hline
+\end{tabular}
+\caption{Performance comparison between raw signal (A) and DSP-enhanced (B) pipelines.}
+\end{table}
+
+Experimental results demonstrate that Pipeline B significantly outperformed Pipeline A across all evaluation metrics. The paired $t$-test confirms this difference is highly significant ($t = -34.79$, $p = 0.000004$). The reasons for this performance gap include:
+
+\begin{enumerate}
+\item \textbf{Feature Representativeness:} Pipeline A relies on basic time-domain features (RMS, ZCR), which only capture 6 dimensions of information. In contrast, Pipeline B utilizes 26-dimensional MFCCs, providing a much richer representation of the speaker's vocal tract characteristics.
+
+\item \textbf{Noise and Artifact Suppression:} The FIR bandpass filter and pre-emphasis in Pipeline B effectively isolate the vocal frequency range and balance the spectral magnitude, reducing the impact of low-frequency noise and high-frequency roll-off.
+
+\item \textbf{Model Generalization:} While Pipeline A struggles with low accuracy (56.3\%), Pipeline B achieves near-perfect classification (97.0\%). Both pipelines use the same SVM classifier with identical hyperparameters ($C=1$, $\gamma=\text{scale}$), isolating the impact of DSP preprocessing as the key differentiator.
+\end{enumerate}
+
+The implementation of dedicated DSP stages proves essential for achieving high-accuracy speaker identification, even with a relatively small dataset of 125 samples from 5 speakers.

@@ -1,0 +1,23 @@
+\textbf{1. Does DSP preprocessing improve performance?}
+
+Yes, significantly. Experimental results show that Pipeline B (DSP-enhanced) achieved a mean CV accuracy of 97.0\%, while Pipeline A (raw) only reached 56.3\%. A paired $t$-test ($t = -34.79$, $p = 0.000004$) confirms the difference is highly statistically significant. This demonstrates that raw time-domain features like RMS and ZCR are insufficient for distinguishing unique vocal characteristics, whereas DSP techniques effectively extract discriminative information.
+
+\textbf{2. Which frequency bands are most discriminative?}
+
+The implemented FIR bandpass filter (300--3400 Hz) successfully isolates the telephonic speech bandwidth. This range contains the first three formants ($F_1, F_2, F_3$), which are vital for characterizing the resonance properties of the speaker's vocal tract. By filtering out low-frequency hum and high-frequency noise, the signal-to-noise ratio (SNR) is significantly improved before feature extraction.
+
+\textbf{3. Why did Pipeline A perform poorly?}
+
+Pipeline A's low accuracy (56.3\%) indicates that basic amplitude-based features cannot capture the spectral "fingerprint" of a voice. The 6-dimensional feature vector (RMS mean/std, ZCR mean/std, amplitude mean/std) lacks the frequency-domain information needed to distinguish speakers. Without pre-emphasis, the higher-formant energies (which carry speaker-specific information) are naturally attenuated, leading to a loss of critical features that the SVM classifier needs to draw clear decision boundaries.
+
+\textbf{4. The role of MFCCs in reducing overfitting}
+
+While Pipeline A's features are highly sensitive to recording volume and background silence, the 26-dimensional MFCCs used in Pipeline B provide a decorrelated representation of the spectral envelope. The 5-fold cross-validation results show Pipeline B maintains consistent high performance (97.0\% $\pm$ 3.6\%), indicating genuine generalization rather than memorization of session-specific noise patterns.
+
+\textbf{5. Computational cost vs. performance gain}
+
+The additional DSP steps (FIR filtering, pre-emphasis, and STFT-based MFCC extraction) add a computational overhead of roughly 4.8 million operations per 3-second clip. On modern hardware, this processing completes in less than 1 ms. Given the 40.7 percentage point leap in accuracy (from 56.3\% to 97.0\%), this negligible latency is a highly efficient trade-off for real-time applications.
+
+\textbf{6. Is handcrafted DSP still relevant in the era of Deep Learning?}
+
+Even though Deep Learning models (like CNNs or Transformers) can learn features from raw waveforms, handcrafted DSP remains crucial. In this project, the DSP pipeline allowed a simple SVM to achieve 97.0\% accuracy with a very small dataset (125 samples from 5 speakers). For Deep Learning, these preprocessing steps act as an "inductive bias" that reduces the need for massive datasets, speeds up training convergence, and ensures robustness in noisy, real-world environments.

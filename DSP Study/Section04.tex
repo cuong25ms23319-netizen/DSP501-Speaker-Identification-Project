@@ -1,0 +1,112 @@
+\subsection{Feature Extraction Pipelines}
+
+In this study, we compare two distinct feature extraction pipelines to evaluate the impact of frequency-domain analysis versus baseline time-domain metrics.
+
+% --- PIPELINE A ---
+\subsubsection*{Pipeline A: Baseline (Time-Domain Features)}
+
+Pipeline A does not utilize advanced Digital Signal Processing (DSP) techniques. Instead, it extracts fundamental time-domain features directly from the raw audio signal. 
+
+\begin{table}[ht]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{|c|l|p{5cm}|c|}
+\hline
+\textbf{\#} & \textbf{Feature} & \textbf{Meaning} & \textbf{Formula} \\ \hline
+1 & \textbf{RMS Energy (mean)} & Average energy (loudness) & $\sqrt{\frac{1}{N}\sum x[n]^2}$ \\ \hline
+2 & \textbf{RMS Energy (std)} & Energy variation (steady vs. fluctuating voice) & Standard deviation of RMS \\ \hline
+3 & \textbf{ZCR (mean)} & Rate of signal sign changes (distinguishes pitch/noisiness) & Zero-crossings per second \\ \hline
+4 & \textbf{ZCR (std)} & Variation in ZCR over frames & Standard deviation of ZCR \\ \hline
+5 & \textbf{Mean $|amplitude|$} & Average absolute amplitude & $\frac{1}{N}\sum |x[n]|$ \\ \hline
+6 & \textbf{Std amplitude} & Amplitude dispersion & $\sigma(x)$ \\ \hline
+\end{tabular}
+\caption{Baseline time-domain features extracted in Pipeline A.}
+\label{tab:pipeline_a}
+\end{table}
+
+\textbf{Result:} A \textbf{6-dimensional feature vector} for each audio file.
+
+\begin{quote}
+\textbf{Remark:} Pipeline A is computationally simple and easy to understand, but it only captures \textbf{time-domain} information. It completely ignores the \textbf{frequency content} (such as formants and timbre), which is vital for distinguishing speech characteristics and speaker identity.
+\end{quote}
+
+% --- PIPELINE B ---
+\subsubsection*{Pipeline B: Advanced (MFCC Features)}
+
+Pipeline B utilizes the comprehensive Mel-Frequency Cepstral Coefficients (MFCC) extraction process. 
+
+\paragraph{Why MFCCs?}
+Mel-Frequency Cepstral Coefficients (MFCCs) capture the shape of the vocal tract's frequency response. Since every person has a different vocal tract, MFCCs are naturally good at distinguishing speakers.
+
+\paragraph{How MFCCs Are Computed}
+\begin{enumerate}
+  
+  \item \textbf{Frame the signal into short segments}
+  \begin{itemize}
+      \item \textbf{Explanation:} Audio signals change constantly over time (non-stationary). However, over very short periods (typically 20-40 ms), the signal is considered statistically stable (stationary). We slice the signal into overlapping frames to capture these stable moments without losing continuity.
+      \item \textbf{Syntax / Parameters:} Frame size $N = 512$ samples, with a stride (hop length) of $256$ samples. If $x[n]$ is the signal, the $i$-th frame is $x_i[n]$.
+  \end{itemize}
+
+  \item \textbf{Apply a Hamming window to each frame}
+  \begin{itemize}
+      \item \textbf{Explanation:} Slicing the signal abruptly creates artificial discontinuities at the edges of the frames, which causes "spectral leakage" (high-frequency noise) when analyzing frequencies. A Hamming window tapers the edges of each frame down to zero, smoothing the signal.
+      \item \textbf{Syntax / Math:} The Hamming window function $w[n]$ is applied to the framed signal $x_i[n]$ to get the windowed frame $y_i[n]$:
+      \begin{equation}
+          w[n] = 0.54 - 0.46 \cos\left(\frac{2\pi n}{N-1}\right)
+      \end{equation}
+      \begin{equation}
+          y_i[n] = x_i[n] \cdot w[n] \quad \text{for } 0 \le n \le N-1
+      \end{equation}
+  \end{itemize}
+
+  \item \textbf{Compute the FFT (Fast Fourier Transform)}
+  \begin{itemize}
+      \item \textbf{Explanation:} We need to know which frequencies are present in each frame. The FFT converts the signal from the time domain into the frequency domain. We then calculate the Power Spectrum to find the energy of each frequency.
+      \item \textbf{Syntax / Math:}
+      \begin{equation}
+          X_i[k] = \sum_{n=0}^{N-1} y_i[n] e^{-j 2\pi k n / N}
+      \end{equation}
+      Power Spectrum $P_i[k]$:
+      \begin{equation}
+          P_i[k] = \frac{1}{N} |X_i[k]|^2
+      \end{equation}
+  \end{itemize}
+
+  \item \textbf{Apply the Mel Filterbank}
+  \begin{itemize}
+      \item \textbf{Explanation:} Human hearing is not linear; we are much better at distinguishing small changes in low pitches than in high pitches. The Mel filterbank mimics this biological trait using a set of overlapping triangular filters that get wider at higher frequencies.
+      \item \textbf{Syntax / Math:} The conversion between Hertz ($f$) and Mel scale is:
+      \begin{equation}
+          \text{Mel}(f) = 2595 \cdot \log_{10}\left(1 + \frac{f}{700}\right)
+      \end{equation}
+      We multiply the Power Spectrum $P_i[k]$ by each triangular filter to get the filterbank energies.
+  \end{itemize}
+
+  \item \textbf{Take the Logarithm of the filterbank energies}
+  \begin{itemize}
+      \item \textbf{Explanation:} Humans perceive loudness logarithmically (which is why sound is measured in decibels). Taking the log of the filterbank energies mimics this perception. Furthermore, it separates the acoustic source (vocal cords) from the filter (vocal tract) mathematically.
+      \item \textbf{Syntax / Math:} If $E_i[m]$ is the energy of the $m$-th Mel filter, the log energy is:
+      \begin{equation}
+          S_i[m] = \log(E_i[m])
+      \end{equation}
+  \end{itemize}
+
+  \item \textbf{Apply the Discrete Cosine Transform (DCT)}
+  \begin{itemize}
+      \item \textbf{Explanation:} Because the Mel filters overlap, the log energies are highly correlated. The DCT decorrelates them and compresses the most important information into the first few coefficients (usually keeping only the first 13). These resulting numbers are the Mel-Frequency Cepstral Coefficients (MFCCs).
+      \item \textbf{Syntax / Math:}
+      \begin{equation}
+          C_i[n] = \sum_{m=0}^{M-1} S_i[m] \cos\left[ \frac{\pi n}{M} \left(m + \frac{1}{2}\right) \right]
+      \end{equation}
+      Where $M$ is the number of Mel filters, and $n = 0, 1, \dots, 12$ to get the 13 coefficients.
+  \end{itemize}
+
+\end{enumerate}
+
+\paragraph{Final Feature Vector Representation}
+Machine learning classifiers (such as SVMs) require a fixed-size input vector for each sample, regardless of the audio clip's original duration. To achieve this, we summarize the frame-level MFCCs by computing the statistical \textbf{mean} and \textbf{standard deviation} for each of the 13 coefficients across all frames:
+\begin{equation}
+    \mathbf{x} = [\mu_1, \mu_2, \ldots, \mu_{13},\ \sigma_1, \sigma_2, \ldots, \sigma_{13}]
+\end{equation}
+
+\noindent \textbf{Result:} A \textbf{26-dimensional feature vector} per audio file. This comprehensive vector captures both the average frequency characteristics ($\mu$) and the dynamic variations of those characteristics over time ($\sigma$).
