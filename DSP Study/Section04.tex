@@ -1,3 +1,33 @@
+\subsection{System Architecture Overview}
+
+Figure~\ref{fig:pipeline_overview} illustrates the complete architecture of both pipelines. Both share the same preprocessing and classifier but differ in the DSP and feature extraction stages.
+
+\begin{figure}[ht]
+\centering
+\small
+\fbox{\parbox{0.95\linewidth}{
+\textbf{Pipeline A --- Baseline (No DSP):}
+\begin{center}
+\begin{tabular}{ccccccc}
+Raw .wav & $\rightarrow$ & Preprocess & $\rightarrow$ & Basic Features & $\rightarrow$ & SVM \\
+& & \scriptsize{normalize, trim,} & & \scriptsize{RMS, ZCR} & & \scriptsize{RBF kernel} \\
+& & \scriptsize{pad to 3s} & & \scriptsize{(6 dims)} & & \\
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\textbf{Pipeline B --- DSP Enhanced:}
+\begin{center}
+\begin{tabular}{ccccccccccc}
+Raw .wav & $\rightarrow$ & Preprocess & $\rightarrow$ & FIR Filter & $\rightarrow$ & Pre-emph. & $\rightarrow$ & MFCC & $\rightarrow$ & SVM \\
+& & \scriptsize{normalize, trim,} & & \scriptsize{300--3400 Hz} & & \scriptsize{$\alpha=0.97$} & & \scriptsize{mean+std} & & \scriptsize{RBF kernel} \\
+& & \scriptsize{pad to 3s} & & \scriptsize{101 taps} & & & & \scriptsize{(26 dims)} & & \\
+\end{tabular}
+\end{center}
+}}
+\caption{System architecture: Pipeline A (baseline) vs.\ Pipeline B (DSP-enhanced). Both pipelines use the same SVM classifier with RBF kernel and StandardScaler to ensure a fair comparison. The key difference is that Pipeline B applies FIR bandpass filtering and pre-emphasis before extracting frequency-domain MFCC features.}
+\label{fig:pipeline_overview}
+\end{figure}
+
 \subsection{Feature Extraction Pipelines}
 
 In this study, we compare two distinct feature extraction pipelines to evaluate the impact of frequency-domain analysis versus baseline time-domain metrics.

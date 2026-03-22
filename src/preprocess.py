@@ -5,15 +5,13 @@ Load and standardize audio files for the speaker identification pipeline.
 
 Steps per file:
   1. Load mono audio at 16 kHz
-  2. Noise reduction (spectral gating)
-  3. Normalize amplitude to [-1, 1]
-  4. Trim leading/trailing silence
-  5. Pad or crop to a fixed 3-second length (48000 samples)
+  2. Normalize amplitude to [-1, 1]
+  3. Trim leading/trailing silence
+  4. Pad or crop to a fixed 3-second length (48000 samples)
 """
 
 import numpy as np
 import librosa
-import noisereduce as nr
 
 
 def load_audio(path, sr=16000):
@@ -49,21 +47,9 @@ def pad_or_crop(y, target_len=48000):
     return y
 
 
-def reduce_noise(y, sr=16000):
-    """
-    Remove background noise using spectral gating.
-
-    Uses noisereduce library: estimates noise profile from
-    the quietest parts of the signal, then subtracts it.
-    Effective for stationary noise (fan, hum, room tone).
-    """
-    return nr.reduce_noise(y=y, sr=sr, stationary=True, prop_decrease=0.75)
-
-
 def preprocess(path, sr=16000, target_len=48000):
     """Full preprocessing pipeline for one audio file."""
     y, sr = load_audio(path, sr)
-    y = reduce_noise(y, sr)
     y = normalize(y)
     y = trim_silence(y)
     y = pad_or_crop(y, target_len)

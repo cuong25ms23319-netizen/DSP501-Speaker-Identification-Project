@@ -5,3 +5,13 @@ Automated Speaker Identification (SID) plays a pivotal role in modern biometric 
 Although modern Deep Learning (DL) models have shown remarkable capability to learn features directly from data, they often require massive datasets and high computational power to achieve robustness. Integrating Digital Signal Processing (DSP) into the AI pipeline offers a more efficient path by "cleaning" the signal and extracting handcrafted features that represent the physical properties of the human vocal tract. This hybrid approach—combining classical DSP with ML—is motivated by the need for systems that are not only accurate, but also computationally sustainable and interpretable.
 \subsection{Research Question}
 The central inquiry of this report is: To what extent does a dedicated DSP preprocessing pipeline (Pipeline B) improve the classification accuracy, Signal-to-Noise Ratio (SNR), and generalization of AI models compared to a baseline approach using raw signal inputs (Pipeline A)?
+
+\subsection{Approach}
+To answer this question, we design and compare two pipelines that share the same preprocessing and classifier but differ in their feature extraction strategy:
+
+\begin{itemize}
+    \item \textbf{Pipeline A (Baseline):} Raw audio $\rightarrow$ Preprocess $\rightarrow$ Time-domain features (RMS, ZCR --- 6 dims) $\rightarrow$ SVM
+    \item \textbf{Pipeline B (DSP Enhanced):} Raw audio $\rightarrow$ Preprocess $\rightarrow$ FIR Bandpass Filter (300--3400 Hz) $\rightarrow$ Pre-emphasis ($\alpha = 0.97$) $\rightarrow$ MFCC (26 dims) $\rightarrow$ SVM
+\end{itemize}
+
+\noindent By keeping the classifier identical (SVM with RBF kernel, same hyperparameter search space), any performance difference can be directly attributed to the DSP preprocessing and feature engineering choices.

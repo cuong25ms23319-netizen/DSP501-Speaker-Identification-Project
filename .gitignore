@@ -23,6 +23,9 @@ figures/
 
 # Results (auto-generated)
 results.json
+.calibrated_devices.json
+_debug_mic.wav
+_test_tmp.wav
 
 # macOS
 .DS_Store

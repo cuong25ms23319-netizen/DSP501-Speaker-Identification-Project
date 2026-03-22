@@ -50,7 +50,7 @@ def train_svm(X, y):
     # Build a pipeline so the scaler is fit only on training data per fold
     pipe = Pipeline([
         ('scaler', StandardScaler()),
-        ('svm',    SVC(kernel='rbf', probability=True, class_weight='balanced', random_state=RANDOM_SEED)),
+        ('svm',    SVC(kernel='rbf', probability=True, random_state=RANDOM_SEED)),
     ])
 
     cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
@@ -118,12 +118,11 @@ def main():
     # Load pre-extracted features
     X_basic = np.load(os.path.join(ROOT, 'features', 'features_basic.npy'))
     X_mfcc  = np.load(os.path.join(ROOT, 'features', 'features_mfcc_filt.npy'))
-    y_basic = np.load(os.path.join(ROOT, 'features', 'labels_basic.npy'))
-    y_mfcc  = np.load(os.path.join(ROOT, 'features', 'labels_mfcc.npy'))
+    y       = np.load(os.path.join(ROOT, 'features', 'labels.npy'))
 
     # Run experiments
-    res_a1, model_a1 = run_experiment('A1_SVM_basic', X_basic, y_basic)
-    res_b1, model_b1 = run_experiment('B1_SVM_dsp',   X_mfcc,  y_mfcc)
+    res_a1, model_a1 = run_experiment('A1_SVM_basic', X_basic, y)
+    res_b1, model_b1 = run_experiment('B1_SVM_dsp',   X_mfcc,  y)
 
     # Statistical test: does filtering improve SVM?
     t_stat, p_value = paired_ttest(

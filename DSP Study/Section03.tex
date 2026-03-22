@@ -1,4 +1,17 @@
 
+\subsection{DSP Processing Pipeline}
+
+Pipeline B applies two sequential DSP stages before feature extraction. The signal flow is:
+
+\begin{center}
+\begin{tabular}{ccccccc}
+Preprocessed & $\xrightarrow{\text{Stage 1}}$ & FIR Bandpass & $\xrightarrow{\text{Stage 2}}$ & Pre-emphasis & $\xrightarrow{}$ & MFCC \\
+audio & & 300--3400 Hz & & $\alpha = 0.97$ & & extraction \\
+\end{tabular}
+\end{center}
+
+\noindent \textbf{Stage 1 (FIR Filter)} isolates the speech-relevant frequency band, removing low-frequency hum ($<300$ Hz) and high-frequency noise ($>3400$ Hz). \textbf{Stage 2 (Pre-emphasis)} compensates for the natural spectral tilt of speech, boosting high-frequency components that carry consonant and speaker-discriminative information. Together, these two stages increase the Signal-to-Noise Ratio (SNR) and flatten the spectrum before MFCC computation.
+
 \subsection{FIR Design}
 
 This section presents the complete set of formulas for FIR filter design using the window method (as implemented in \texttt{firwin}).

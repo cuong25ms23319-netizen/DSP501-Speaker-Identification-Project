@@ -60,22 +60,16 @@ def extract_mfcc(y, sr=SR, n_mfcc=N_MFCC):
     """
     Pipeline B: MFCC feature vector (after FIR + pre-emphasis).
 
-    Steps:
-      1. Compute 13 MFCC coefficients per frame
-      2. Drop MFCC[0] (log-energy — channel-dependent)
-      3. Aggregate: mean + std → 24-dim vector
-
     Returns
     -------
-    feature : 1-D array of shape (24,)
+    feature : 1-D array of shape (2 * n_mfcc,) = (mean, std) concatenated
     """
     mfcc = librosa.feature.mfcc(y=y, sr=sr,
                                  n_mfcc=n_mfcc,
                                  n_fft=N_FFT,
                                  hop_length=HOP_LENGTH)
-    mfcc = mfcc[1:]            # drop MFCC[0] (energy — channel-dependent)
-    mean = mfcc.mean(axis=1)   # shape (12,)
-    std = mfcc.std(axis=1)     # shape (12,)
+    mean = mfcc.mean(axis=1)   # shape (n_mfcc,)
+    std = mfcc.std(axis=1)     # shape (n_mfcc,)
     return np.concatenate([mean, std])
 
 
@@ -98,7 +92,25 @@ def augment_audio(y, sr=SR):
     return augmented
 
 
-def build_dataset(index_csv, pipeline='raw', data_dir='data/raw', augment=False):
+def sliding_windows(audio, window_len, hop_len):
+    """
+    Split audio into overlapping windows.
+    Returns list of audio segments, each of length window_len.
+    """
+    segments = []
+    for start in range(0, len(audio) - window_len + 1, hop_len):
+        segments.append(audio[start:start + window_len])
+    return segments
+
+
+# Sliding window parameters
+WINDOW_SEC = 1.5    # 1.5-second windows
+HOP_SEC = 0.5       # 0.5-second hop → 4 windows per 3s clip
+WINDOW_LEN = int(WINDOW_SEC * SR)  # 24000 samples
+HOP_LEN_SW = int(HOP_SEC * SR)     # 8000 samples
+
+
+def build_dataset(index_csv, pipeline='raw', data_dir='data/raw', use_sliding_window=False):
     """
     Build feature matrix X and label array y from an index CSV.
 
@@ -107,7 +119,8 @@ def build_dataset(index_csv, pipeline='raw', data_dir='data/raw', augment=False)
     index_csv : path to CSV with columns [filename, speaker_id, speaker_name]
     pipeline  : 'raw' (Pipeline A) or 'filtered' (Pipeline B)
     data_dir  : root folder containing speaker subdirectories
-    augment   : if True, add augmented versions for Pipeline B
+    use_sliding_window : if True, split each clip into overlapping windows
+                         to increase sample count with real data
 
     Returns
     -------
@@ -124,26 +137,22 @@ def build_dataset(index_csv, pipeline='raw', data_dir='data/raw', augment=False)
         path = os.path.join(data_dir, row['filename'])
         audio, sr = preprocess(path, sr=SR, target_len=TARGET_LEN)
 
-        if pipeline == 'filtered':
-            # Pipeline B: FIR → pre-emphasis → MFCC
-            audio_f = apply_filter(audio, fir_coeffs)
-            audio_f = pre_emphasize(audio_f)
-            feat = extract_mfcc(audio_f, sr=sr)
-            X.append(feat)
-            y.append(int(row['speaker_id']))
-            names.append(row['speaker_name'])
-
-            # Data augmentation: add variations for robustness
-            if augment:
-                for aug_audio in augment_audio(audio, sr):
-                    aug_f = apply_filter(aug_audio, fir_coeffs)
-                    aug_f = pre_emphasize(aug_f)
-                    X.append(extract_mfcc(aug_f, sr=sr))
-                    y.append(int(row['speaker_id']))
-                    names.append(row['speaker_name'])
+        # Get audio segments (1 original or multiple windows)
+        if use_sliding_window:
+            segments = sliding_windows(audio, WINDOW_LEN, HOP_LEN_SW)
         else:
-            # Pipeline A: basic time-domain features only
-            feat = extract_basic_features(audio, sr=sr)
+            segments = [audio]
+
+        for seg in segments:
+            if pipeline == 'filtered':
+                # Pipeline B: FIR → pre-emphasis → MFCC
+                seg_f = apply_filter(seg, fir_coeffs)
+                seg_f = pre_emphasize(seg_f)
+                feat = extract_mfcc(seg_f, sr=sr)
+            else:
+                # Pipeline A: basic time-domain features only
+                feat = extract_basic_features(seg, sr=sr)
+
             X.append(feat)
             y.append(int(row['speaker_id']))
             names.append(row['speaker_name'])
@@ -159,21 +168,17 @@ def save_features(index_csv, features_dir='features', data_dir='data/raw'):
     os.makedirs(features_dir, exist_ok=True)
 
     print("Extracting features — Pipeline A (basic time-domain) ...")
-    X_basic, y_basic, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
+    X_basic, y, _ = build_dataset(index_csv, pipeline='raw', data_dir=data_dir)
 
     print("Extracting features — Pipeline B (FIR + pre-emphasis + MFCC) ...")
-    X_mfcc, y_mfcc, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir, augment=False)
+    X_mfcc, _, _ = build_dataset(index_csv, pipeline='filtered', data_dir=data_dir)
 
     np.save(os.path.join(features_dir, 'features_basic.npy'), X_basic)
     np.save(os.path.join(features_dir, 'features_mfcc_filt.npy'), X_mfcc)
-    np.save(os.path.join(features_dir, 'labels_basic.npy'), y_basic)
-    np.save(os.path.join(features_dir, 'labels_mfcc.npy'), y_mfcc)
-    # Backward compat
-    np.save(os.path.join(features_dir, 'labels.npy'), y_basic)
+    np.save(os.path.join(features_dir, 'labels.npy'), y)
 
-    print(f"Saved: X_basic{X_basic.shape}, X_mfcc{X_mfcc.shape}")
-    print(f"       y_basic{y_basic.shape}, y_mfcc{y_mfcc.shape}")
-    return X_basic, X_mfcc, y_basic, y_mfcc
+    print(f"Saved: X_basic{X_basic.shape}, X_mfcc{X_mfcc.shape}, y{y.shape}")
+    return X_basic, X_mfcc, y
 
 
 # ── Quick test ──────────────────────────────────────────────────────

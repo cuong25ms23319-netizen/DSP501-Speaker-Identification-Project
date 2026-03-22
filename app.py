@@ -293,7 +293,28 @@ with tab_test:
     model_b_path = os.path.join(ROOT, 'models', 'svm_pipeline_b.pkl')
 
     if not (os.path.exists(model_a_path) and os.path.exists(model_b_path)):
-        st.error('Chưa có model! Hãy vào tab **Train** để train trước.')
+        st.warning('Chưa có model. Đang tự động train lần đầu...')
+        with st.spinner('Đang extract features & train model... (chờ ~30 giây)'):
+            try:
+                result = subprocess.run(
+                    ['python3', os.path.join(ROOT, 'src', 'feature_extraction.py')],
+                    capture_output=True, text=True, cwd=ROOT, timeout=120
+                )
+                if result.returncode == 0:
+                    result2 = subprocess.run(
+                        ['python3', os.path.join(ROOT, 'src', 'train.py')],
+                        capture_output=True, text=True, cwd=ROOT, timeout=120
+                    )
+                    if result2.returncode == 0:
+                        st.success('Train xong! Refresh trang để bắt đầu test.')
+                        st.rerun()
+                    else:
+                        st.error(f'Train lỗi: {result2.stderr[:500]}')
+                else:
+                    st.error(f'Feature extraction lỗi: {result.stderr[:500]}')
+            except Exception as e:
+                st.error(f'Lỗi: {e}')
+        st.stop()
     else:
         def load_models():
             return {
@@ -444,23 +465,30 @@ with tab_test:
             name_a = speaker_map.get(pred_a, f'Speaker {pred_a}')
             conf_a = float(proba_a[list(classes_a).index(pred_a)]) * 100
 
-            # ── Hero result card ─────────────────────────────────
-            if conf_b >= 70:
+            # ── Stranger detection ─────────────────────────────
+            STRANGER_THRESHOLD = 60  # confidence < 60% → người lạ
+            is_stranger = conf_b < STRANGER_THRESHOLD
+
+            if is_stranger:
+                # Override: hiện người lạ, KHÔNG hiện tên speaker
+                display_name = 'Người lạ'
+                border_color = '#e74c3c'
+                emoji = '🚨'
+                status_text = f'Không nhận diện được (conf. {conf_b:.0f}% < {STRANGER_THRESHOLD}%)'
+            elif conf_b >= 70:
+                display_name = name_b
                 border_color = '#2ecc71'
                 emoji = '🎯'
                 status_text = 'Độ tin cậy cao'
-            elif conf_b >= 50:
+            else:
+                display_name = name_b
                 border_color = '#f39c12'
                 emoji = '🤔'
                 status_text = 'Độ tin cậy trung bình'
-            else:
-                border_color = '#e74c3c'
-                emoji = '❓'
-                status_text = 'Không chắc chắn'
 
             st.markdown(f"""
             <div style="
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                background: linear-gradient(135deg, {'#2d0e0e' if is_stranger else '#1a1a2e'} 0%, {'#3a1a1a' if is_stranger else '#16213e'} 50%, {'#2e1616' if is_stranger else '#0f3460'} 100%);
                 border-left: 6px solid {border_color};
                 border-radius: 16px;
                 padding: 30px;
@@ -469,8 +497,8 @@ with tab_test:
             ">
                 <div style="text-align: center;">
                     <span style="font-size: 48px;">{emoji}</span>
-                    <h1 style="color: white; margin: 10px 0 5px 0; font-size: 2.2em;">
-                        {name_b}
+                    <h1 style="color: {'#e74c3c' if is_stranger else 'white'}; margin: 10px 0 5px 0; font-size: 2.2em;">
+                        {display_name}
                     </h1>
                     <div style="
                         display: inline-block;
@@ -590,35 +618,35 @@ with tab_test:
             st.markdown('---')
             import random
 
-            if conf_b >= 70:
+            if is_stranger:
+                all_names = ', '.join(sorted(set(speaker_map.values())))
+                greetings = [
+                    f"Cảnh báo bảo mật! Giọng nói không khớp với bất kỳ thành viên nào trong hệ thống. Các thành viên đã đăng ký: {all_names}. Độ tin cậy cao nhất chỉ {conf_b:.0f} phần trăm, thấp hơn ngưỡng {STRANGER_THRESHOLD} phần trăm. Truy cập bị từ chối.",
+                    f"Phát hiện người lạ! Sau khi phân tích 13 hệ số MFCC qua bộ lọc FIR và đối chiếu với {len(speaker_map)} người nói đã đăng ký, không tìm thấy kết quả khớp. Confidence chỉ {conf_b:.0f} phần trăm. Bạn không thuộc hệ thống này.",
+                ]
+                greeting_text = random.choice(greetings)
+                g_emoji = '🚨'
+                border = '#e74c3c'
+                bg = 'linear-gradient(135deg, #2d0e0e 0%, #3a1a1a 50%, #2e1616 100%)'
+            elif conf_b >= 70:
                 greetings = [
                     f"Xin chào {name_b}! Tôi nhận ra giọng nói của bạn ngay lập tức. Hệ thống DSP phân tích đặc trưng thanh quản và xác nhận danh tính của bạn với độ tin cậy {conf_b:.0f} phần trăm. Chào mừng bạn quay trở lại!",
                     f"Chào {name_b}! Giọng nói của bạn rất đặc trưng. Sau khi phân tích qua bộ lọc FIR và trích xuất MFCC, tôi tự tin {conf_b:.0f} phần trăm rằng bạn chính là {name_b}. Rất vui được gặp lại!",
-                    f"À, {name_b} đây rồi! Tôi đã phân tích 12 hệ số MFCC từ giọng nói của bạn và đối chiếu với cơ sở dữ liệu. Kết quả khớp {conf_b:.0f} phần trăm. Xin chào!",
+                    f"À, {name_b} đây rồi! Tôi đã phân tích 13 hệ số MFCC từ giọng nói của bạn và đối chiếu với cơ sở dữ liệu. Kết quả khớp {conf_b:.0f} phần trăm. Xin chào!",
                 ]
                 greeting_text = random.choice(greetings)
-                emoji = '🤖'
+                g_emoji = '🤖'
                 border = '#2ecc71'
                 bg = 'linear-gradient(135deg, #0d2818 0%, #1a3a2e 50%, #16213e 100%)'
-            elif conf_b >= 50:
+            else:
                 greetings = [
                     f"Hmm, tôi nghĩ bạn là {name_b}, nhưng chưa chắc lắm. Độ tin cậy chỉ {conf_b:.0f} phần trăm. Có thể môi trường hơi ồn. Bạn thử nói lại gần mic hơn được không?",
                     f"Nếu tôi đoán không nhầm thì bạn là {name_b}? Tín hiệu hơi nhiễu nên tôi chỉ tự tin {conf_b:.0f} phần trăm thôi. Thử thu âm lại trong môi trường yên tĩnh hơn nhé!",
                 ]
                 greeting_text = random.choice(greetings)
-                emoji = '🤔'
+                g_emoji = '🤔'
                 border = '#f39c12'
                 bg = 'linear-gradient(135deg, #2d1f0e 0%, #3a2a1e 50%, #2e2e16 100%)'
-            else:
-                all_names = ', '.join(sorted(set(speaker_map.values())))
-                greetings = [
-                    f"Cảnh báo! Bạn không phải thành viên nhóm 4. Hệ thống chỉ nhận diện được: {all_names}. Giọng nói của bạn không khớp với bất kỳ ai trong cơ sở dữ liệu. Độ tin cậy cao nhất chỉ {conf_b:.0f} phần trăm — quá thấp để xác nhận danh tính.",
-                    f"Phát hiện người lạ! Sau khi phân tích MFCC và đối chiếu với {len(speaker_map)} người nói đã đăng ký, không tìm thấy kết quả khớp. Confidence chỉ {conf_b:.0f} phần trăm. Bạn không thuộc hệ thống nhận diện này.",
-                ]
-                greeting_text = random.choice(greetings)
-                emoji = '🚨'
-                border = '#e74c3c'
-                bg = 'linear-gradient(135deg, #2d0e0e 0%, #3a1a1a 50%, #2e1616 100%)'
 
             st.markdown(f"""
             <div style="
@@ -636,7 +664,7 @@ with tab_test:
                         width: 52px; height: 52px;
                         display: flex; align-items: center; justify-content: center;
                         font-size: 28px; flex-shrink: 0;
-                    ">{emoji}</div>
+                    ">{g_emoji}</div>
                     <div>
                         <p style="color: {border}; font-size: 0.8em; font-weight: bold; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 1px;">
                             DSP AI Assistant

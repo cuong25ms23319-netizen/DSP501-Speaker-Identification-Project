@@ -33,7 +33,9 @@
       "Bash(lsof -ti:8502)",
       "Bash(pip3 show:*)",
       "Bash(pip3 install:*)",
-      "Bash(python3 make_slides.py)"
+      "Bash(python3 make_slides.py)",
+      "Bash(npx --yes @marp-team/marp-cli --version)",
+      "Bash(npx --yes @marp-team/marp-cli slides.md --pptx --output Speaker_Identification_Slides.pptx --allow-local-files)"
     ]
   }
 }
